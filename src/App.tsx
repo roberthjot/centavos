@@ -1,11 +1,14 @@
 // CENTAVOS — Main App component
-// State-based routing (no react-router), initializes default data on first run
-import { useCallback } from 'react'
+// Auth via Supabase. All state loaded from DB after login.
+import { useState, useEffect, useCallback } from 'react'
+import type { User } from '@supabase/supabase-js'
 import type { Account, Transaction, Budget, Goal, Settings, Page } from './types'
-import { useStorage } from './hooks/useStorage'
+import { supabase } from './lib/supabase'
+import * as db from './lib/db'
 import { useFinance } from './hooks/useFinance'
-import { STORAGE_KEYS, DEFAULT_ACCOUNTS, DEFAULT_SETTINGS } from './utils/constants'
+import { DEFAULT_SETTINGS } from './utils/constants'
 import { Sidebar } from './components/layout/Sidebar'
+import { Login } from './pages/Login'
 import { Dashboard } from './pages/Dashboard'
 import { Transactions } from './pages/Transactions'
 import { Budget as BudgetPage } from './pages/Budget'
@@ -13,151 +16,230 @@ import { Goals } from './pages/Goals'
 import { Accounts } from './pages/Accounts'
 import { Settings as SettingsPage } from './pages/Settings'
 
-/** Generate a unique ID using the browser's crypto API */
-const uid = () => crypto.randomUUID()
+// ── Loading screen ────────────────────────────────────────────
+function LoadingScreen() {
+  return (
+    <div style={{
+      minHeight: '100dvh', background: '#080818',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      flexDirection: 'column', gap: '16px',
+    }}>
+      <div style={{
+        fontFamily: "'Syne', sans-serif", fontWeight: 800,
+        fontSize: '28px', color: '#8b5cf6',
+      }}>
+        CENTAVOS
+      </div>
+      <div style={{ fontSize: '13px', color: '#6b6b9e' }}>Cargando...</div>
+    </div>
+  )
+}
 
 export default function App() {
-  // ---- Persistent state from localStorage ----
-  const [activePage, setActivePage] = useStorage<Page>('fin:activePage', 'dashboard')
-  const [accounts, setAccounts] = useStorage<Account[]>(STORAGE_KEYS.accounts, DEFAULT_ACCOUNTS)
-  const [transactions, setTransactions] = useStorage<Transaction[]>(STORAGE_KEYS.transactions, [])
-  const [goals, setGoals] = useStorage<Goal[]>(STORAGE_KEYS.goals, [])
-  const [budgets, setBudgets] = useStorage<Budget[]>(STORAGE_KEYS.budgets, [])
-  const [settings, setSettings] = useStorage<Settings>(STORAGE_KEYS.settings, DEFAULT_SETTINGS)
+  // ── Auth state ────────────────────────────────────────────
+  const [user, setUser]       = useState<User | null>(null)
+  const [authLoading, setAuthLoading] = useState(true)
 
-  // ---- Computed financial values ----
+  // ── App state ─────────────────────────────────────────────
+  const [activePage, setActivePage]     = useState<Page>('dashboard')
+  const [accounts, setAccounts]         = useState<Account[]>([])
+  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [goals, setGoals]               = useState<Goal[]>([])
+  const [budgets, setBudgets]           = useState<Budget[]>([])
+  const [settings, setSettings]         = useState<Settings>(DEFAULT_SETTINGS)
+
+  // ── Listen for auth changes ───────────────────────────────
+  useEffect(() => {
+    // Check current session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null)
+      setAuthLoading(false)
+    })
+    // Subscribe to future changes (login / logout)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+    })
+    return () => subscription.unsubscribe()
+  }, [])
+
+  // ── Load all data when user logs in ───────────────────────
+  useEffect(() => {
+    if (!user) {
+      // Clear state on logout
+      setAccounts([])
+      setTransactions([])
+      setGoals([])
+      setBudgets([])
+      setSettings(DEFAULT_SETTINGS)
+      return
+    }
+    loadAllData()
+  }, [user])
+
+  const loadAllData = async () => {
+    const [accs, txs, gls, bgs, sett] = await Promise.all([
+      db.getAccounts(),
+      db.getTransactions(),
+      db.getGoals(),
+      db.getBudgets(),
+      db.getSettings(),
+    ])
+    setAccounts(accs)
+    setTransactions(txs)
+    setGoals(gls)
+    setBudgets(bgs)
+    if (sett) {
+      setSettings(sett)
+    } else {
+      // First login — create default settings row
+      await db.upsertSettings(DEFAULT_SETTINGS)
+    }
+  }
+
+  // ── Computed financial values ─────────────────────────────
   const finance = useFinance(accounts, transactions, goals, budgets, settings)
 
-  // ---- Account CRUD ----
-  const addAccount = useCallback((data: Omit<Account, 'id' | 'createdAt'>) => {
-    const account: Account = { ...data, id: uid(), createdAt: new Date().toISOString() }
-    setAccounts((prev: Account[]) => [...prev, account])
-  }, [setAccounts])
+  // ── Account CRUD ──────────────────────────────────────────
+  const addAccount = useCallback(async (data: Omit<Account, 'id' | 'createdAt'>) => {
+    const account = await db.addAccount(data)
+    if (account) setAccounts(prev => [...prev, account])
+  }, [])
 
-  const deleteAccount = useCallback((id: string) => {
-    setAccounts((prev: Account[]) => prev.filter(a => a.id !== id))
-  }, [setAccounts])
+  const deleteAccount = useCallback(async (id: string) => {
+    await db.deleteAccount(id)
+    setAccounts(prev => prev.filter(a => a.id !== id))
+    setTransactions(prev => prev.filter(tx => tx.accountId !== id))
+  }, [])
 
-  // ---- Transaction CRUD ----
-  const addTransaction = useCallback((data: Omit<Transaction, 'id' | 'createdAt'>) => {
-    const tx: Transaction = { ...data, id: uid(), createdAt: new Date().toISOString() }
-    setTransactions((prev: Transaction[]) => [...prev, tx])
-  }, [setTransactions])
+  // ── Transaction CRUD ──────────────────────────────────────
+  const addTransaction = useCallback(async (data: Omit<Transaction, 'id' | 'createdAt'>) => {
+    const tx = await db.addTransaction(data)
+    if (tx) setTransactions(prev => [tx, ...prev])
+  }, [])
 
-  const updateTransaction = useCallback((id: string, data: Partial<Transaction>) => {
-    setTransactions((prev: Transaction[]) => prev.map(tx => tx.id === id ? { ...tx, ...data } : tx))
-  }, [setTransactions])
+  const updateTransaction = useCallback(async (id: string, data: Partial<Transaction>) => {
+    await db.updateTransaction(id, data)
+    setTransactions(prev => prev.map(tx => tx.id === id ? { ...tx, ...data } : tx))
+  }, [])
 
-  const deleteTransaction = useCallback((id: string) => {
-    setTransactions((prev: Transaction[]) => prev.filter(tx => tx.id !== id))
-  }, [setTransactions])
+  const deleteTransaction = useCallback(async (id: string) => {
+    await db.deleteTransaction(id)
+    setTransactions(prev => prev.filter(tx => tx.id !== id))
+  }, [])
 
-  // ---- Goal CRUD ----
-  const addGoal = useCallback((data: Omit<Goal, 'id' | 'createdAt'>) => {
-    const goal: Goal = { ...data, id: uid(), createdAt: new Date().toISOString() }
-    setGoals((prev: Goal[]) => [...prev, goal])
-  }, [setGoals])
+  // ── Goal CRUD ─────────────────────────────────────────────
+  const addGoal = useCallback(async (data: Omit<Goal, 'id' | 'createdAt'>) => {
+    const goal = await db.addGoal(data)
+    if (goal) setGoals(prev => [...prev, goal])
+  }, [])
 
-  const updateGoal = useCallback((id: string, data: Partial<Goal>) => {
-    setGoals((prev: Goal[]) => prev.map(g => g.id === id ? { ...g, ...data } : g))
-  }, [setGoals])
+  const updateGoal = useCallback(async (id: string, data: Partial<Goal>) => {
+    await db.updateGoal(id, data)
+    setGoals(prev => prev.map(g => g.id === id ? { ...g, ...data } : g))
+  }, [])
 
-  const deleteGoal = useCallback((id: string) => {
-    setGoals((prev: Goal[]) => prev.filter(g => g.id !== id))
-  }, [setGoals])
+  const deleteGoal = useCallback(async (id: string) => {
+    await db.deleteGoal(id)
+    setGoals(prev => prev.filter(g => g.id !== id))
+  }, [])
 
-  // ---- Budget CRUD ----
-  const addBudget = useCallback((data: Omit<Budget, 'id'>) => {
-    const budget: Budget = { ...data, id: uid() }
-    setBudgets((prev: Budget[]) => [...prev, budget])
-  }, [setBudgets])
+  // ── Budget CRUD ───────────────────────────────────────────
+  const addBudget = useCallback(async (data: Omit<Budget, 'id'>) => {
+    const budget = await db.addBudget(data)
+    if (budget) setBudgets(prev => [...prev, budget])
+  }, [])
 
-  const deleteBudget = useCallback((id: string) => {
-    setBudgets((prev: Budget[]) => prev.filter(b => b.id !== id))
-  }, [setBudgets])
+  const deleteBudget = useCallback(async (id: string) => {
+    await db.deleteBudget(id)
+    setBudgets(prev => prev.filter(b => b.id !== id))
+  }, [])
 
-  // ---- Settings update ----
-  const updateSettings = useCallback((partial: Partial<Settings>) => {
-    setSettings((prev: Settings) => ({ ...prev, ...partial }))
-  }, [setSettings])
+  // ── Settings update ───────────────────────────────────────
+  const updateSettings = useCallback(async (partial: Partial<Settings>) => {
+    const updated = { ...settings, ...partial }
+    setSettings(updated)
+    await db.upsertSettings(updated)
+  }, [settings])
 
-  // ---- Clear all data (reset to defaults) ----
-  const clearAllData = useCallback(() => {
-    setAccounts(DEFAULT_ACCOUNTS)
+  // ── Clear all data ────────────────────────────────────────
+  const clearAllData = useCallback(async () => {
+    // Delete all rows for current user (cascade handles transactions)
+    await Promise.all([
+      ...accounts.map(a => db.deleteAccount(a.id)),
+      ...goals.map(g => db.deleteGoal(g.id)),
+      ...budgets.map(b => db.deleteBudget(b.id)),
+    ])
+    await db.upsertSettings(DEFAULT_SETTINGS)
+    setAccounts([])
     setTransactions([])
     setGoals([])
     setBudgets([])
     setSettings(DEFAULT_SETTINGS)
-  }, [setAccounts, setTransactions, setGoals, setBudgets, setSettings])
+  }, [accounts, goals, budgets])
 
-  // ---- Page renderer ----
+  // ── Sign out ──────────────────────────────────────────────
+  const handleSignOut = useCallback(async () => {
+    await supabase.auth.signOut()
+  }, [])
+
+  // ── Page renderer ─────────────────────────────────────────
   const renderPage = () => {
     switch (activePage) {
       case 'dashboard':
         return (
           <Dashboard
-            accounts={accounts}
-            transactions={transactions}
-            goals={goals}
-            budgets={budgets}
-            settings={settings}
+            accounts={accounts} transactions={transactions}
+            goals={goals} budgets={budgets} settings={settings}
             onNavigate={setActivePage}
           />
         )
       case 'transactions':
         return (
           <Transactions
-            accounts={accounts}
-            transactions={transactions}
-            settings={settings}
-            onAdd={addTransaction}
-            onUpdate={updateTransaction}
-            onDelete={deleteTransaction}
+            accounts={accounts} transactions={transactions} settings={settings}
+            onAdd={addTransaction} onUpdate={updateTransaction} onDelete={deleteTransaction}
           />
         )
       case 'budget':
         return (
           <BudgetPage
-            budgets={budgets}
-            transactions={transactions}
-            settings={settings}
-            onAdd={addBudget}
-            onDelete={deleteBudget}
+            budgets={budgets} transactions={transactions} settings={settings}
+            onAdd={addBudget} onDelete={deleteBudget}
           />
         )
       case 'goals':
         return (
           <Goals
             goals={goals}
-            onAdd={addGoal}
-            onUpdate={updateGoal}
-            onDelete={deleteGoal}
+            onAdd={addGoal} onUpdate={updateGoal} onDelete={deleteGoal}
           />
         )
       case 'accounts':
         return (
           <Accounts
-            accounts={accounts}
-            settings={settings}
+            accounts={accounts} settings={settings}
             getBalance={finance.getAccountBalance}
             getTransactionCount={finance.getTransactionCount}
-            onAdd={addAccount}
-            onDelete={deleteAccount}
+            onAdd={addAccount} onDelete={deleteAccount}
           />
         )
       case 'settings':
         return (
           <SettingsPage
-            settings={settings}
-            accounts={accounts}
+            settings={settings} accounts={accounts}
             onUpdateSettings={updateSettings}
             onClearData={clearAllData}
+            onSignOut={handleSignOut}
           />
         )
       default:
         return null
     }
   }
+
+  // ── Render ────────────────────────────────────────────────
+  if (authLoading) return <LoadingScreen />
+  if (!user)       return <Login />
 
   return (
     <div className="app-layout">

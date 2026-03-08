@@ -9,9 +9,10 @@ interface SettingsProps {
   accounts: Account[]
   onUpdateSettings: (s: Partial<SettingsType>) => void
   onClearData: () => void
+  onSignOut: () => void
 }
 
-export function Settings({ settings, accounts, onUpdateSettings, onClearData }: SettingsProps) {
+export function Settings({ settings, accounts, onUpdateSettings, onClearData, onSignOut }: SettingsProps) {
   const isMobile = useIsMobile()
   const [rateInput, setRateInput] = useState(String(settings.exchangeRate))
   const [rateSaved, setRateSaved] = useState(false)
@@ -277,15 +278,15 @@ export function Settings({ settings, accounts, onUpdateSettings, onClearData }: 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: '#6b6b9e' }}>Versión</span>
-              <span style={{ color: '#eeeef8' }}>1.0.0</span>
+              <span style={{ color: '#eeeef8' }}>1.1.0</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: '#6b6b9e' }}>Tecnología</span>
               <span style={{ color: '#eeeef8' }}>React 19 + Vite + TypeScript</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: '#6b6b9e' }}>Almacenamiento</span>
-              <span style={{ color: '#eeeef8' }}>localStorage (offline)</span>
+              <span style={{ color: '#6b6b9e' }}>Base de datos</span>
+              <span style={{ color: '#eeeef8' }}>Supabase (PostgreSQL)</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: '#6b6b9e' }}>Monedas</span>
@@ -294,7 +295,23 @@ export function Settings({ settings, accounts, onUpdateSettings, onClearData }: 
           </div>
           <div style={{ marginTop: '16px', fontSize: '12px', color: '#6b6b9e', lineHeight: 1.6 }}>
             CENTAVOS — App de finanzas personales para emprendedores venezolanos.
-            Todos los datos se guardan localmente en tu navegador. Sin servidores, sin cuentas.
+            Datos sincronizados en la nube. Accede desde cualquier dispositivo.
+          </div>
+        </>,
+      )}
+
+      {/* Sign out */}
+      {card(
+        <>
+          {sectionTitle('Sesión')}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontSize: '13px', color: '#eeeef8', marginBottom: '2px' }}>Cerrar sesión</div>
+              <div style={{ fontSize: '12px', color: '#6b6b9e' }}>Salir de tu cuenta en este dispositivo</div>
+            </div>
+            <button onClick={onSignOut} style={btnSecondary}>
+              Cerrar sesión
+            </button>
           </div>
         </>,
       )}
