@@ -50,14 +50,12 @@ export default function App() {
 
   // ── Listen for auth changes ───────────────────────────────
   useEffect(() => {
-    // Check current session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null)
-      setAuthLoading(false)
-    })
-    // Subscribe to future changes (login / logout)
+    // onAuthStateChange fires INITIAL_SESSION after processing any #access_token hash,
+    // so we rely on it exclusively — getSession() resolves before the hash is parsed
+    // and would incorrectly set authLoading=false before OAuth redirect is handled.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
+      setAuthLoading(false)
     })
     return () => subscription.unsubscribe()
   }, [])
