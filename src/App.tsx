@@ -52,7 +52,6 @@ export default function App() {
   useEffect(() => {
     let resolved = false
 
-    // onAuthStateChange handles: login, logout, OAuth callback (PKCE + implicit)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log('[auth] event:', event, '| user:', session?.user?.email ?? null)
       resolved = true
@@ -60,13 +59,30 @@ export default function App() {
       setAuthLoading(false)
     })
 
-    // Safety fallback: if onAuthStateChange never fires (rare race condition),
-    // resolve the loading state after 2s using getSession()
+    // Handle implicit OAuth redirect: Supabase puts #access_token= in the URL hash.
+    // We parse it and call setSession() explicitly so the SDK stores the session
+    // and fires SIGNED_IN via onAuthStateChange above.
+    const hash = window.location.hash
+    if (hash.includes('access_token=')) {
+      const params = new URLSearchParams(hash.slice(1))
+      const access_token  = params.get('access_token')  ?? ''
+      const refresh_token = params.get('refresh_token') ?? ''
+      if (access_token) {
+        console.log('[auth] found access_token in hash — calling setSession()')
+        supabase.auth.setSession({ access_token, refresh_token }).then(({ error }) => {
+          if (error) console.error('[auth] setSession error:', error.message)
+          // Clean up the hash so it doesn't stay in the URL bar
+          window.history.replaceState(null, '', window.location.pathname)
+        })
+      }
+    }
+
+    // Fallback: if onAuthStateChange never fires within 2 s (race condition),
+    // resolve loading state directly via getSession()
     const fallback = setTimeout(async () => {
       if (!resolved) {
-        console.log('[auth] fallback: calling getSession()')
+        console.log('[auth] fallback triggered')
         const { data: { session } } = await supabase.auth.getSession()
-        console.log('[auth] fallback result:', session?.user?.email ?? null)
         resolved = true
         setUser(session?.user ?? null)
         setAuthLoading(false)

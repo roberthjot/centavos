@@ -10,8 +10,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    flowType: 'pkce',          // More reliable than implicit hash flow
-    detectSessionInUrl: true,  // Auto-detect ?code= after OAuth redirect
+    detectSessionInUrl: true,
     persistSession: true,
     autoRefreshToken: true,
   },
