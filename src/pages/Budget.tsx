@@ -3,6 +3,7 @@ import { useState } from 'react'
 import type { Budget, Transaction, Settings } from '../types'
 import { formatUSD, toUSD, currentMonth } from '../utils/currency'
 import { EXPENSE_CATEGORIES } from '../utils/constants'
+import { useIsMobile } from '../hooks/useIsMobile'
 import { Modal } from '../components/ui/Modal'
 import { BudgetCard } from '../components/ui/BudgetCard'
 import { ProgressBar } from '../components/ui/ProgressBar'
@@ -20,6 +21,7 @@ interface BudgetProps {
 export function Budget({ budgets, transactions, settings, onAdd, onDelete }: BudgetProps) {
   const [month, setMonth] = useState(currentMonth())
   const [modalOpen, setModalOpen] = useState(false)
+  const isMobile = useIsMobile()
   const [form, setForm] = useState({
     category: '',
     limit: '',
@@ -52,11 +54,13 @@ export function Budget({ budgets, transactions, settings, onAdd, onDelete }: Bud
 
   const totalBarColor = totalPct >= 100 ? '#f43f5e' : totalPct >= 70 ? '#f59e0b' : '#10d97a'
 
+  const pad = isMobile ? '16px' : '32px'
+
   return (
-    <div style={{ padding: '32px' }}>
+    <div style={{ padding: pad }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <h1 style={{ margin: 0, fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: '24px', color: '#eeeef8' }}>
+        <h1 style={{ margin: 0, fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: isMobile ? '20px' : '24px', color: '#eeeef8' }}>
           Presupuesto
         </h1>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
@@ -133,7 +137,7 @@ export function Budget({ budgets, transactions, settings, onAdd, onDelete }: Bud
           {/* Budget grid */}
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(2, 1fr)',
+            gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)',
             gap: '16px',
           }}>
             {monthBudgets.map(b => (

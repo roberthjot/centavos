@@ -140,6 +140,48 @@ button {
   transition: all 0.15s ease;
 }
 
+/* ===== Responsive — Mobile Layout ===== */
+
+/*
+ * On mobile (< 768px):
+ * - Sidebar becomes a fixed bottom nav bar (icons + labels, horizontal)
+ * - Main content fills the rest of the screen above it
+ * - Extra bottom padding so content doesn't hide under the nav bar
+ */
+@media (max-width: 767px) {
+  .app-layout {
+    flex-direction: column;
+    height: 100dvh; /* dynamic viewport height (handles mobile browser chrome) */
+  }
+
+  .sidebar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    height: 62px;
+    flex-direction: row;
+    border-right: none;
+    border-top: 1px solid #18183a;
+    overflow: hidden;
+    z-index: 200;
+  }
+
+  .main-content {
+    height: calc(100dvh - 62px);
+    max-height: calc(100dvh - 62px);
+    /* Extra bottom padding so last content item is never hidden behind the nav bar */
+    padding-bottom: 24px;
+  }
+}
+
+/* ===== Animations ===== */
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
 /* ===== Recharts Tooltip Dark Override ===== */
 .recharts-tooltip-wrapper .recharts-default-tooltip {
   background: #131328 !important;

@@ -1,5 +1,6 @@
 // Settings page — exchange rate, defaults, data management, app info
 import { useState } from 'react'
+import { useIsMobile } from '../hooks/useIsMobile'
 import type { Account, Settings as SettingsType } from '../types'
 import { exportAllData, importAllData } from '../utils/storage'
 
@@ -11,6 +12,7 @@ interface SettingsProps {
 }
 
 export function Settings({ settings, accounts, onUpdateSettings, onClearData }: SettingsProps) {
+  const isMobile = useIsMobile()
   const [rateInput, setRateInput] = useState(String(settings.exchangeRate))
   const [rateSaved, setRateSaved] = useState(false)
   const [clearConfirm, setClearConfirm] = useState(false)
@@ -132,9 +134,11 @@ export function Settings({ settings, accounts, onUpdateSettings, onClearData }: 
     transition: 'all 0.15s',
   }
 
+  const pad = isMobile ? '16px' : '32px'
+
   return (
-    <div style={{ padding: '32px', maxWidth: '640px' }}>
-      <h1 style={{ margin: '0 0 28px 0', fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: '24px', color: '#eeeef8' }}>
+    <div style={{ padding: pad, maxWidth: isMobile ? '100%' : '640px' }}>
+      <h1 style={{ margin: '0 0 28px 0', fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: isMobile ? '20px' : '24px', color: '#eeeef8' }}>
         Configuración
       </h1>
 
@@ -180,7 +184,7 @@ export function Settings({ settings, accounts, onUpdateSettings, onClearData }: 
       {card(
         <>
           {sectionTitle('Preferencias por defecto')}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '16px' }}>
             <div>
               <label style={labelStyle}>Moneda predeterminada</label>
               <select

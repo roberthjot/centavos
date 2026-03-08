@@ -1,6 +1,7 @@
 // Dashboard page — KPI cards, area chart, pie chart, recent transactions, goals preview
 import type { Account, Transaction, Goal, Budget, Settings } from '../types'
 import { useFinance } from '../hooks/useFinance'
+import { useIsMobile } from '../hooks/useIsMobile'
 import { formatUSD, formatVES, formatAmount, toUSD, currentMonth } from '../utils/currency'
 import { KPICard } from '../components/ui/KPICard'
 import { ProgressBar } from '../components/ui/ProgressBar'
@@ -59,6 +60,7 @@ const CustomPieTooltip = ({ active, payload }: any) => {
 }
 
 export function Dashboard({ accounts, transactions, goals, budgets, settings, onNavigate }: DashboardProps) {
+  const isMobile = useIsMobile()
   const finance = useFinance(accounts, transactions, goals, budgets, settings)
   const month = currentMonth()
   const { income, expenses } = finance.getMonthlyTotals(month)
@@ -72,12 +74,13 @@ export function Dashboard({ accounts, transactions, goals, budgets, settings, on
     .sort((a, b) => b.saved / b.target - a.saved / a.target)
     .slice(0, 3)
 
-
   const TYPE_COLOR: Record<string, string> = {
     income: '#10d97a',
     expense: '#f43f5e',
     transfer: '#38bdf8',
   }
+
+  const pad = isMobile ? '16px' : '32px'
 
   const section = (title: string, action?: { label: string; onClick: () => void }) => (
     <div style={{
@@ -114,24 +117,24 @@ export function Dashboard({ accounts, transactions, goals, budgets, settings, on
   )
 
   return (
-    <div style={{ padding: '32px', maxWidth: '1200px' }}>
+    <div style={{ padding: pad, maxWidth: '1200px' }}>
       {/* Page title */}
       <h1 style={{
         margin: '0 0 28px 0',
         fontFamily: "'Syne', sans-serif",
         fontWeight: 800,
-        fontSize: '24px',
+        fontSize: isMobile ? '20px' : '24px',
         color: '#eeeef8',
       }}>
         Dashboard
       </h1>
 
-      {/* KPI Cards */}
+      {/* KPI Cards — 2 columns on mobile, 4 on desktop */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(4, 1fr)',
-        gap: '16px',
-        marginBottom: '32px',
+        gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
+        gap: isMobile ? '10px' : '16px',
+        marginBottom: isMobile ? '20px' : '32px',
       }}>
         <KPICard
           title="Patrimonio Neto"
@@ -163,12 +166,17 @@ export function Dashboard({ accounts, transactions, goals, budgets, settings, on
         />
       </div>
 
-      {/* Charts Row */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '20px', marginBottom: '32px' }}>
+      {/* Charts Row — stacked on mobile, side by side on desktop */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: isMobile ? '1fr' : '1fr 380px',
+        gap: '20px',
+        marginBottom: isMobile ? '20px' : '32px',
+      }}>
         {/* Area Chart */}
         <div style={{ background: '#0c0c1e', border: '1px solid #18183a', borderRadius: '10px', padding: '20px' }}>
           {section('Ingresos vs Gastos — últimos 6 meses')}
-          <ResponsiveContainer width="100%" height={220}>
+          <ResponsiveContainer width="100%" height={isMobile ? 180 : 220}>
             <AreaChart data={finance.last6MonthsData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
@@ -181,8 +189,8 @@ export function Dashboard({ accounts, transactions, goals, budgets, settings, on
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#18183a" />
-              <XAxis dataKey="label" stroke="#6b6b9e" tick={{ fontSize: 11, fontFamily: "'IBM Plex Mono', monospace" }} />
-              <YAxis stroke="#6b6b9e" tick={{ fontSize: 11, fontFamily: "'IBM Plex Mono', monospace" }} tickFormatter={v => `$${v}`} />
+              <XAxis dataKey="label" stroke="#6b6b9e" tick={{ fontSize: 10, fontFamily: "'IBM Plex Mono', monospace" }} />
+              <YAxis stroke="#6b6b9e" tick={{ fontSize: 10, fontFamily: "'IBM Plex Mono', monospace" }} tickFormatter={v => `$${v}`} />
               <Tooltip content={<CustomTooltip />} />
               <Area type="monotone" dataKey="income" name="Ingresos" stroke="#10d97a" fill="url(#colorIncome)" strokeWidth={2} />
               <Area type="monotone" dataKey="expenses" name="Gastos" stroke="#f43f5e" fill="url(#colorExpenses)" strokeWidth={2} />
@@ -194,11 +202,11 @@ export function Dashboard({ accounts, transactions, goals, budgets, settings, on
         <div style={{ background: '#0c0c1e', border: '1px solid #18183a', borderRadius: '10px', padding: '20px' }}>
           {section('Gastos por categoría')}
           {categoryBreakdown.length === 0 ? (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '220px', color: '#6b6b9e', fontSize: '13px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: isMobile ? '160px' : '220px', color: '#6b6b9e', fontSize: '13px' }}>
               Sin gastos este mes
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height={220}>
+            <ResponsiveContainer width="100%" height={isMobile ? 200 : 220}>
               <PieChart>
                 <Pie
                   data={categoryBreakdown}
@@ -206,8 +214,8 @@ export function Dashboard({ accounts, transactions, goals, budgets, settings, on
                   nameKey="category"
                   cx="40%"
                   cy="50%"
-                  innerRadius={50}
-                  outerRadius={80}
+                  innerRadius={isMobile ? 40 : 50}
+                  outerRadius={isMobile ? 65 : 80}
                   paddingAngle={2}
                 >
                   {categoryBreakdown.map((entry, i) => (
@@ -233,8 +241,12 @@ export function Dashboard({ accounts, transactions, goals, budgets, settings, on
         </div>
       </div>
 
-      {/* Bottom Row */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px' }}>
+      {/* Bottom Row — stacked on mobile, 3 columns on desktop */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr',
+        gap: '20px',
+      }}>
         {/* Account Balances */}
         <div style={{ background: '#0c0c1e', border: '1px solid #18183a', borderRadius: '10px', padding: '20px' }}>
           {section('Cuentas', { label: 'Ver todas', onClick: () => onNavigate('accounts') })}

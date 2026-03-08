@@ -1,8 +1,9 @@
-// Transactions page — filterable table with add/edit/delete modal
+// Transactions page — filterable table (desktop) / card list (mobile) with add/edit/delete
 import { useState, useMemo } from 'react'
 import type { Transaction, Account, Settings } from '../types'
-import { formatUSD, toUSD, currentMonth } from '../utils/currency'
+import { formatUSD, formatAmount, toUSD, currentMonth } from '../utils/currency'
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, CATEGORY_EMOJI } from '../utils/constants'
+import { useIsMobile } from '../hooks/useIsMobile'
 import { Modal } from '../components/ui/Modal'
 import { TypeSelector } from '../components/ui/TypeSelector'
 import { CurrencyInput } from '../components/ui/CurrencyInput'
@@ -29,7 +30,19 @@ const EMPTY_FORM = {
   note: '',
 }
 
+const TYPE_COLOR: Record<Transaction['type'], string> = {
+  income: '#10d97a',
+  expense: '#f43f5e',
+  transfer: '#38bdf8',
+}
+const TYPE_SIGN: Record<Transaction['type'], string> = {
+  income: '+',
+  expense: '−',
+  transfer: '⇄',
+}
+
 export function Transactions({ accounts, transactions, settings, onAdd, onUpdate, onDelete }: TransactionsProps) {
+  const isMobile = useIsMobile()
   const [filterMonth, setFilterMonth] = useState(currentMonth())
   const [filterType, setFilterType] = useState<'all' | Transaction['type']>('all')
   const [filterCategory, setFilterCategory] = useState('')
@@ -122,17 +135,19 @@ export function Transactions({ accounts, transactions, settings, onAdd, onUpdate
     <div style={{ marginBottom: '16px', ...style }}>{children}</div>
   )
 
+  const pad = isMobile ? '16px' : '32px'
+
   return (
-    <div style={{ padding: '32px' }}>
+    <div style={{ padding: pad }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <h1 style={{ margin: 0, fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: '24px', color: '#eeeef8' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <h1 style={{ margin: 0, fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: isMobile ? '20px' : '24px', color: '#eeeef8' }}>
           Movimientos
         </h1>
         <button
           onClick={openNew}
           style={{
-            padding: '10px 18px',
+            padding: isMobile ? '9px 14px' : '10px 18px',
             background: '#8b5cf6',
             color: '#eeeef8',
             border: 'none',
@@ -150,32 +165,31 @@ export function Transactions({ accounts, transactions, settings, onAdd, onUpdate
         </button>
       </div>
 
-      {/* Filter bar */}
+      {/* Filter bar — 2-column grid on mobile, auto-width row on desktop */}
       <div style={{
-        display: 'flex',
-        gap: '12px',
-        marginBottom: '16px',
-        flexWrap: 'wrap',
-        alignItems: 'center',
+        display: 'grid',
+        gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, auto)',
+        gap: '10px',
+        marginBottom: '14px',
       }}>
         <input
           type="month"
           value={filterMonth}
           onChange={e => setFilterMonth(e.target.value)}
-          style={{ width: '160px' }}
+          style={{ width: '100%' }}
         />
-        <select value={filterType} onChange={e => setFilterType(e.target.value as any)} style={{ width: '150px' }}>
+        <select value={filterType} onChange={e => setFilterType(e.target.value as any)} style={{ width: '100%' }}>
           <option value="all">Todos los tipos</option>
           <option value="income">Ingreso</option>
           <option value="expense">Gasto</option>
           <option value="transfer">Transferencia</option>
         </select>
-        <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)} style={{ width: '160px' }}>
+        <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)} style={{ width: '100%' }}>
           <option value="">Todas las categorías</option>
           {INCOME_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
           {EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
-        <select value={filterAccount} onChange={e => setFilterAccount(e.target.value)} style={{ width: '160px' }}>
+        <select value={filterAccount} onChange={e => setFilterAccount(e.target.value)} style={{ width: '100%' }}>
           <option value="">Todas las cuentas</option>
           {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
         </select>
@@ -193,7 +207,7 @@ export function Transactions({ accounts, transactions, settings, onAdd, onUpdate
         display: 'flex',
         gap: '16px',
       }}>
-        <span>{filtered.length} transacciones</span>
+        <span>{filtered.length} movimientos</span>
         <span>
           Balance:{' '}
           <span style={{ color: filteredBalance >= 0 ? '#10d97a' : '#f43f5e', fontWeight: 600 }}>
@@ -202,7 +216,7 @@ export function Transactions({ accounts, transactions, settings, onAdd, onUpdate
         </span>
       </div>
 
-      {/* Table */}
+      {/* Content: empty state / mobile cards / desktop table */}
       {filtered.length === 0 ? (
         <EmptyState
           emoji="💸"
@@ -211,7 +225,63 @@ export function Transactions({ accounts, transactions, settings, onAdd, onUpdate
           ctaLabel="+ Nuevo movimiento"
           onCta={openNew}
         />
+      ) : isMobile ? (
+        /* ── Mobile: card list ─────────────────────────────────────────── */
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {filtered.map(tx => {
+            const acc = accounts.find(a => a.id === tx.accountId)
+            const toAcc = tx.toAccountId ? accounts.find(a => a.id === tx.toAccountId) : null
+            const color = TYPE_COLOR[tx.type]
+            const sign = TYPE_SIGN[tx.type]
+            const emoji = CATEGORY_EMOJI[tx.category] ?? '🔖'
+            const [, mm, dd] = tx.date.split('-')
+            return (
+              <div
+                key={tx.id}
+                onClick={() => openEdit(tx)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  padding: '12px 14px',
+                  background: '#0c0c1e',
+                  border: '1px solid #18183a',
+                  borderLeft: `3px solid ${color}`,
+                  borderRadius: '10px',
+                  cursor: 'pointer',
+                }}
+              >
+                <span style={{ fontSize: '20px', flexShrink: 0 }}>{emoji}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{
+                    fontSize: '13px', color: '#eeeef8', fontWeight: 500,
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>
+                    {tx.note || tx.category}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#6b6b9e', marginTop: '2px' }}>
+                    {acc?.name}{toAcc ? ` → ${toAcc.name}` : ''} · {dd}/{mm}
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                  <div style={{ fontSize: '14px', fontWeight: 600, color }}>
+                    {sign}{formatAmount(tx.amount, tx.currency)}
+                  </div>
+                </div>
+                <button
+                  onClick={e => { e.stopPropagation(); onDelete(tx.id) }}
+                  style={{ flexShrink: 0, color: '#6b6b9e', fontSize: '18px', padding: '4px 6px', borderRadius: '4px', transition: 'color 0.12s' }}
+                  onMouseEnter={e => (e.currentTarget.style.color = '#f43f5e')}
+                  onMouseLeave={e => (e.currentTarget.style.color = '#6b6b9e')}
+                >
+                  ×
+                </button>
+              </div>
+            )
+          })}
+        </div>
       ) : (
+        /* ── Desktop: full table ───────────────────────────────────────── */
         <div style={{ background: '#0c0c1e', border: '1px solid #18183a', borderRadius: '10px', overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
@@ -259,7 +329,7 @@ export function Transactions({ accounts, transactions, settings, onAdd, onUpdate
           }}
         />
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
           {fieldWrap(
             <>
               {inputLabel('Fecha')}
@@ -331,14 +401,9 @@ export function Transactions({ accounts, transactions, settings, onAdd, onUpdate
           <button
             onClick={() => setModalOpen(false)}
             style={{
-              padding: '9px 18px',
-              background: '#131328',
-              color: '#6b6b9e',
-              border: '1px solid #18183a',
-              borderRadius: '6px',
-              fontSize: '13px',
-              fontFamily: "'IBM Plex Mono', monospace",
-              cursor: 'pointer',
+              padding: '9px 18px', background: '#131328', color: '#6b6b9e',
+              border: '1px solid #18183a', borderRadius: '6px', fontSize: '13px',
+              fontFamily: "'IBM Plex Mono', monospace", cursor: 'pointer',
             }}
           >
             Cancelar
@@ -346,15 +411,9 @@ export function Transactions({ accounts, transactions, settings, onAdd, onUpdate
           <button
             onClick={handleSave}
             style={{
-              padding: '9px 18px',
-              background: '#8b5cf6',
-              color: '#eeeef8',
-              border: 'none',
-              borderRadius: '6px',
-              fontSize: '13px',
-              fontWeight: 600,
-              fontFamily: "'IBM Plex Mono', monospace",
-              cursor: 'pointer',
+              padding: '9px 18px', background: '#8b5cf6', color: '#eeeef8',
+              border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600,
+              fontFamily: "'IBM Plex Mono', monospace", cursor: 'pointer',
             }}
           >
             {editingId ? 'Guardar' : 'Agregar'}

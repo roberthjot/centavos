@@ -3,6 +3,7 @@ import { useState } from 'react'
 import type { Account, Settings } from '../types'
 import { formatUSD, toUSD } from '../utils/currency'
 import { ACCOUNT_TYPES, ACCOUNT_COLORS } from '../utils/constants'
+import { useIsMobile } from '../hooks/useIsMobile'
 import { Modal } from '../components/ui/Modal'
 import { AccountCard } from '../components/ui/AccountCard'
 import { ColorPicker } from '../components/ui/ColorPicker'
@@ -27,6 +28,7 @@ const EMPTY_FORM = {
 }
 
 export function Accounts({ accounts, settings, getBalance, getTransactionCount, onAdd, onDelete }: AccountsProps) {
+  const isMobile = useIsMobile()
   const [modalOpen, setModalOpen] = useState(false)
   const [form, setForm] = useState(EMPTY_FORM)
 
@@ -51,11 +53,13 @@ export function Accounts({ accounts, settings, getBalance, getTransactionCount, 
   const f = (key: keyof typeof form, value: string) =>
     setForm(prev => ({ ...prev, [key]: value }))
 
+  const pad = isMobile ? '16px' : '32px'
+
   return (
-    <div style={{ padding: '32px' }}>
+    <div style={{ padding: pad }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <h1 style={{ margin: 0, fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: '24px', color: '#eeeef8' }}>
+        <h1 style={{ margin: 0, fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: isMobile ? '20px' : '24px', color: '#eeeef8' }}>
           Cuentas
         </h1>
         <button
@@ -107,7 +111,7 @@ export function Accounts({ accounts, settings, getBalance, getTransactionCount, 
       ) : (
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
+          gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
           gap: '16px',
         }}>
           {accounts.map(acc => (
