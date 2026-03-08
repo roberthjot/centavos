@@ -35,6 +35,14 @@ interface SettingsRow {
   default_currency: string; default_account_id: string | null
 }
 
+// ── Auth helper ───────────────────────────────────────────────
+// getSession() reads from localStorage (no network call) — safe to call often.
+async function uid(): Promise<string> {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.user) throw new Error('Not authenticated')
+  return session.user.id
+}
+
 // ── Mappers (DB row → TypeScript interface) ──────────────────
 
 const mapAccount = (r: AccountRow): Account => ({
@@ -82,6 +90,7 @@ export async function getAccounts(): Promise<Account[]> {
 
 export async function addAccount(d: Omit<Account, 'id' | 'createdAt'>): Promise<Account | null> {
   const { data, error } = await supabase.from('accounts').insert({
+    user_id: await uid(),                          // required: RLS checks auth.uid() = user_id
     name: d.name, type: d.type, currency: d.currency,
     initial_balance: d.initialBalance, color: d.color,
   }).select().single()
@@ -105,6 +114,7 @@ export async function getTransactions(): Promise<Transaction[]> {
 
 export async function addTransaction(d: Omit<Transaction, 'id' | 'createdAt'>): Promise<Transaction | null> {
   const { data, error } = await supabase.from('transactions').insert({
+    user_id: await uid(),                          // required: RLS checks auth.uid() = user_id
     account_id: d.accountId, to_account_id: d.toAccountId ?? null,
     date: d.date, type: d.type, amount: d.amount, currency: d.currency,
     category: d.category, note: d.note ?? null, tags: d.tags ?? null,
@@ -143,6 +153,7 @@ export async function getBudgets(): Promise<Budget[]> {
 
 export async function addBudget(d: Omit<Budget, 'id'>): Promise<Budget | null> {
   const { data, error } = await supabase.from('budgets').insert({
+    user_id: await uid(),                          // required: RLS checks auth.uid() = user_id
     month: d.month, category: d.category,
     limit_amount: d.limit, currency: d.currency,
   }).select().single()
@@ -166,6 +177,7 @@ export async function getGoals(): Promise<Goal[]> {
 
 export async function addGoal(d: Omit<Goal, 'id' | 'createdAt'>): Promise<Goal | null> {
   const { data, error } = await supabase.from('goals').insert({
+    user_id: await uid(),                          // required: RLS checks auth.uid() = user_id
     name: d.name, emoji: d.emoji, target: d.target, saved: d.saved,
     currency: d.currency, deadline: d.deadline ?? null, note: d.note ?? null,
   }).select().single()
@@ -194,13 +206,16 @@ export async function deleteGoal(id: string): Promise<void> {
 // ── Settings ─────────────────────────────────────────────────
 
 export async function getSettings(): Promise<Settings | null> {
-  const { data, error } = await supabase.from('settings').select('*').single()
-  if (error) return null   // null means first login — App.tsx will upsert defaults
+  // maybeSingle() returns null (no error) when no row exists — avoids 406 on first login
+  const { data, error } = await supabase.from('settings').select('*').maybeSingle()
+  if (error) { console.error('getSettings:', error); return null }
+  if (!data) return null
   return mapSettings(data as SettingsRow)
 }
 
 export async function upsertSettings(s: Settings): Promise<void> {
   const { error } = await supabase.from('settings').upsert({
+    user_id: await uid(),                          // required: PK + RLS checks auth.uid() = user_id
     exchange_rate: s.exchangeRate,
     exchange_rate_updated_at: s.exchangeRateUpdatedAt ?? null,
     default_currency: s.defaultCurrency,
