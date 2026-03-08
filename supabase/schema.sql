@@ -71,12 +71,13 @@ ALTER TABLE budgets      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE goals        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE settings     ENABLE ROW LEVEL SECURITY;
 
--- Each user only sees and modifies their own rows
-CREATE POLICY "own_accounts"     ON accounts     FOR ALL USING (auth.uid() = user_id);
-CREATE POLICY "own_transactions" ON transactions FOR ALL USING (auth.uid() = user_id);
-CREATE POLICY "own_budgets"      ON budgets      FOR ALL USING (auth.uid() = user_id);
-CREATE POLICY "own_goals"        ON goals        FOR ALL USING (auth.uid() = user_id);
-CREATE POLICY "own_settings"     ON settings     FOR ALL USING (auth.uid() = user_id);
+-- Each user only sees and modifies their own rows.
+-- WITH CHECK is required for INSERT/UPDATE operations (USING alone only covers SELECT/DELETE).
+CREATE POLICY "own_accounts"     ON accounts     FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "own_transactions" ON transactions FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "own_budgets"      ON budgets      FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "own_goals"        ON goals        FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "own_settings"     ON settings     FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
 -- ── Indexes (performance) ─────────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_transactions_user  ON transactions (user_id);
