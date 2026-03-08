@@ -1,0 +1,151 @@
+/* Tailwind CSS v4 — base import */
+@import "tailwindcss";
+
+/* ===== CENTAVOS Design System — CSS Custom Properties ===== */
+@theme {
+  /* Color palette */
+  --color-bg: #06060f;
+  --color-surface: #0c0c1e;
+  --color-surface-elevated: #131328;
+  --color-border: #18183a;
+  --color-purple: #8b5cf6;
+  --color-green: #10d97a;
+  --color-red: #f43f5e;
+  --color-yellow: #f59e0b;
+  --color-blue: #38bdf8;
+  --color-text: #eeeef8;
+  --color-muted: #6b6b9e;
+
+  /* Typography */
+  --font-mono: 'IBM Plex Mono', 'Courier New', monospace;
+  --font-display: 'Syne', sans-serif;
+}
+
+/* ===== Global Reset & Base ===== */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: #06060f;
+  color: #eeeef8;
+  font-family: 'IBM Plex Mono', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ===== Custom Scrollbar ===== */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: #06060f;
+}
+::-webkit-scrollbar-thumb {
+  background: #18183a;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #8b5cf6;
+}
+
+/* ===== Input & Select Base ===== */
+input, select, textarea {
+  font-family: 'IBM Plex Mono', 'Courier New', monospace;
+  font-size: 14px;
+  outline: none;
+  background: #131328;
+  color: #eeeef8;
+  border: 1px solid #18183a;
+  border-radius: 6px;
+  padding: 8px 12px;
+  width: 100%;
+  transition: border-color 0.15s;
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: #8b5cf6;
+}
+
+input::placeholder, textarea::placeholder {
+  color: #6b6b9e;
+}
+
+/* Inputs for type="month" and type="date" dark styling */
+input[type="month"]::-webkit-calendar-picker-indicator,
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1) opacity(0.5);
+  cursor: pointer;
+}
+
+select option {
+  background: #131328;
+  color: #eeeef8;
+}
+
+/* ===== Button Reset ===== */
+button {
+  font-family: 'IBM Plex Mono', 'Courier New', monospace;
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+}
+
+/* ===== Layout Utilities ===== */
+.app-layout {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.sidebar {
+  width: 210px;
+  flex-shrink: 0;
+  background: #0c0c1e;
+  border-right: 1px solid #18183a;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.main-content {
+  flex: 1;
+  overflow-y: auto;
+  background: #06060f;
+}
+
+/* ===== Typography Utilities ===== */
+.font-display {
+  font-family: 'Syne', sans-serif;
+  font-weight: 800;
+}
+
+.font-mono {
+  font-family: 'IBM Plex Mono', 'Courier New', monospace;
+}
+
+/* ===== Transition Utilities ===== */
+.transition-fast {
+  transition: all 0.15s ease;
+}
+
+/* ===== Recharts Tooltip Dark Override ===== */
+.recharts-tooltip-wrapper .recharts-default-tooltip {
+  background: #131328 !important;
+  border: 1px solid #18183a !important;
+  border-radius: 8px !important;
+  color: #eeeef8 !important;
+  font-family: 'IBM Plex Mono', monospace !important;
+  font-size: 13px !important;
+}
