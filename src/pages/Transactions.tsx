@@ -20,14 +20,16 @@ interface TransactionsProps {
 }
 
 const EMPTY_FORM = {
-  type: 'expense' as Transaction['type'],
-  date: new Date().toISOString().slice(0, 10),
-  amount: '',
-  currency: 'USD' as 'USD' | 'VES',
-  category: '',
-  accountId: '',
+  type:        'expense' as Transaction['type'],
+  date:        new Date().toISOString().slice(0, 10),
+  amount:      '',   // used for income / expense
+  sent:        '',   // transfer only — amount leaving source account
+  received:    '',   // transfer only — amount arriving at destination
+  currency:    'USD' as 'USD' | 'VES',
+  category:    '',
+  accountId:   '',
   toAccountId: '',
-  note: '',
+  note:        '',
 }
 
 const TYPE_COLOR: Record<Transaction['type'], string> = {
@@ -87,38 +89,84 @@ export function Transactions({ accounts, transactions, settings, onAdd, onUpdate
   const openEdit = (tx: Transaction) => {
     setEditingId(tx.id)
     setForm({
-      type: tx.type,
-      date: tx.date,
-      amount: String(tx.amount),
-      currency: tx.currency,
-      category: tx.category,
-      accountId: tx.accountId,
+      type:        tx.type,
+      date:        tx.date,
+      amount:      String(tx.amount),
+      sent:        tx.type === 'transfer' ? String(tx.amount) : '',
+      received:    tx.type === 'transfer' ? String(tx.amount) : '',
+      currency:    tx.currency,
+      category:    tx.category,
+      accountId:   tx.accountId,
       toAccountId: tx.toAccountId ?? '',
-      note: tx.note ?? '',
+      note:        tx.note ?? '',
     })
     setModalOpen(true)
   }
 
   const handleSave = () => {
-    if (!form.amount || !form.category || !form.accountId) return
-    const amount = parseFloat(form.amount)
-    if (isNaN(amount) || amount <= 0) return
+    const isTransfer = form.type === 'transfer'
 
-    const data: Omit<Transaction, 'id' | 'createdAt'> = {
-      type: form.type,
-      date: form.date,
-      amount,
-      currency: form.currency,
-      category: form.category,
-      accountId: form.accountId,
-      toAccountId: form.type === 'transfer' ? form.toAccountId || undefined : undefined,
-      note: form.note || undefined,
-    }
-    if (editingId) {
-      onUpdate(editingId, data)
+    if (isTransfer) {
+      // Transfer: validate sent + received + accounts
+      const sent     = parseFloat(form.sent)
+      const received = parseFloat(form.received)
+      if (isNaN(sent) || sent <= 0)                          return
+      if (isNaN(received) || received <= 0)                  return
+      if (received > sent)                                   return  // can't receive more than sent
+      if (!form.accountId || !form.toAccountId)              return
+
+      const fee = parseFloat((sent - received).toFixed(8))
+
+      const transferData: Omit<Transaction, 'id' | 'createdAt'> = {
+        type:        'transfer',
+        date:        form.date,
+        amount:      received,                     // destination receives this amount
+        currency:    form.currency,
+        category:    'Transferencia',
+        accountId:   form.accountId,
+        toAccountId: form.toAccountId,
+        note:        form.note || undefined,
+      }
+
+      if (editingId) {
+        onUpdate(editingId, transferData)
+      } else {
+        onAdd(transferData)
+        // If there's a fee, create a separate expense transaction on the source account
+        if (fee > 0) {
+          onAdd({
+            type:      'expense',
+            date:      form.date,
+            amount:    fee,
+            currency:  form.currency,
+            category:  'Comisiones',
+            accountId: form.accountId,
+            note:      `Comisión: enviado ${sent} → recibido ${received}${form.note ? ` (${form.note})` : ''}`,
+          })
+        }
+      }
     } else {
-      onAdd(data)
+      // Income / expense — original logic
+      if (!form.amount || !form.category || !form.accountId) return
+      const amount = parseFloat(form.amount)
+      if (isNaN(amount) || amount <= 0) return
+
+      const data: Omit<Transaction, 'id' | 'createdAt'> = {
+        type:        form.type,
+        date:        form.date,
+        amount,
+        currency:    form.currency,
+        category:    form.category,
+        accountId:   form.accountId,
+        note:        form.note || undefined,
+      }
+      if (editingId) {
+        onUpdate(editingId, data)
+      } else {
+        onAdd(data)
+      }
     }
+
     setModalOpen(false)
   }
 
@@ -336,31 +384,80 @@ export function Transactions({ accounts, transactions, settings, onAdd, onUpdate
               <input type="date" value={form.date} onChange={e => f('date', e.target.value)} />
             </>,
           )}
-          {fieldWrap(
+          {form.type !== 'transfer' && fieldWrap(
             <>
               {inputLabel('Categoría')}
               <select value={form.category} onChange={e => f('category', e.target.value)}>
                 <option value="">Seleccionar...</option>
-                {form.type === 'transfer'
-                  ? <option value="Transferencia">Transferencia</option>
-                  : (form.type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).map(c => (
-                      <option key={c} value={c}>{CATEGORY_EMOJI[c] ?? ''} {c}</option>
-                    ))}
+                {(form.type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).map(c => (
+                  <option key={c} value={c}>{CATEGORY_EMOJI[c] ?? ''} {c}</option>
+                ))}
               </select>
             </>,
           )}
         </div>
 
-        {fieldWrap(
+        {form.type === 'transfer' ? (
+          /* ── Transfer: sent / received / auto fee ───────────────────── */
           <>
-            {inputLabel('Monto')}
-            <CurrencyInput
-              amount={form.amount}
-              currency={form.currency}
-              onAmountChange={v => f('amount', v)}
-              onCurrencyChange={v => setForm(prev => ({ ...prev, currency: v }))}
-            />
-          </>,
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+              <div>
+                {inputLabel('Enviado (sale de origen)')}
+                <CurrencyInput
+                  amount={form.sent}
+                  currency={form.currency}
+                  onAmountChange={v => setForm(p => ({ ...p, sent: v }))}
+                  onCurrencyChange={v => setForm(p => ({ ...p, currency: v }))}
+                />
+              </div>
+              <div>
+                {inputLabel('Recibido (llega al destino)')}
+                <input
+                  type="number"
+                  value={form.received}
+                  onChange={e => setForm(p => ({ ...p, received: e.target.value }))}
+                  placeholder="0.00"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+            </div>
+            {/* Auto-calculated fee preview */}
+            {form.sent && form.received && parseFloat(form.sent) > 0 && parseFloat(form.received) > 0 && (() => {
+              const fee = parseFloat(form.sent) - parseFloat(form.received)
+              if (fee < 0) return (
+                <div style={{ padding: '10px 14px', background: '#f43f5e12', border: '1px solid #f43f5e40', borderRadius: '8px', fontSize: '12px', color: '#f43f5e', marginBottom: '16px' }}>
+                  ⚠ El monto recibido no puede ser mayor al enviado
+                </div>
+              )
+              if (fee === 0) return (
+                <div style={{ padding: '10px 14px', background: '#10d97a12', border: '1px solid #10d97a30', borderRadius: '8px', fontSize: '12px', color: '#10d97a', marginBottom: '16px' }}>
+                  ✓ Sin comisión — transferencia exacta
+                </div>
+              )
+              return (
+                <div style={{ padding: '10px 14px', background: '#f59e0b12', border: '1px solid #f59e0b40', borderRadius: '8px', fontSize: '12px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: '#6b6b9e' }}>🏦 Comisión calculada automáticamente:</span>
+                  <span style={{ color: '#f59e0b', fontWeight: 700, fontFamily: "'IBM Plex Mono', monospace", fontSize: '14px' }}>
+                    -{fee.toFixed(2)} {form.currency}
+                  </span>
+                </div>
+              )
+            })()}
+          </>
+        ) : (
+          /* ── Income / Expense: normal amount field ──────────────────── */
+          fieldWrap(
+            <>
+              {inputLabel('Monto')}
+              <CurrencyInput
+                amount={form.amount}
+                currency={form.currency}
+                onAmountChange={v => f('amount', v)}
+                onCurrencyChange={v => setForm(prev => ({ ...prev, currency: v }))}
+              />
+            </>,
+          )
         )}
 
         {fieldWrap(

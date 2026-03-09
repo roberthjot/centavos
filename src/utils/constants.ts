@@ -15,6 +15,7 @@ export const EXPENSE_CATEGORIES = [
   'Personal',
   'Deudas',
   'Suscripciones',
+  'Comisiones',
   'Otro gasto',
 ] as const
 
@@ -125,6 +126,7 @@ export const CATEGORY_EMOJI: Record<string, string> = {
   'Personal': '🧴',
   'Deudas': '💸',
   'Suscripciones': '📦',
+  'Comisiones': '🏦',
   'Otro gasto': '🔖',
   'Clipping': '✂️',
   'YouTube/TikTok': '🎥',
