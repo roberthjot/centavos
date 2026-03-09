@@ -1,4 +1,5 @@
 // Dashboard page — KPI cards, area chart, pie chart, recent transactions, goals preview
+import { useState } from 'react'
 import type { Account, Transaction, Goal, Budget, Settings } from '../types'
 import { useFinance } from '../hooks/useFinance'
 import { useIsMobile } from '../hooks/useIsMobile'
@@ -59,16 +60,38 @@ const CustomPieTooltip = ({ active, payload }: any) => {
   )
 }
 
+// ── Month navigation helpers ──────────────────────────────────
+function shiftMonth(ym: string, delta: number): string {
+  const [y, m] = ym.split('-').map(Number)
+  const d = new Date(y, m - 1 + delta, 1)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+function formatMonthLabel(ym: string): string {
+  const [y, m] = ym.split('-').map(Number)
+  return new Date(y, m - 1, 1).toLocaleString('es-VE', { month: 'long', year: 'numeric' })
+}
+
 export function Dashboard({ accounts, transactions, goals, budgets, settings, onNavigate }: DashboardProps) {
   const isMobile = useIsMobile()
   const finance = useFinance(accounts, transactions, goals, budgets, settings)
-  const month = currentMonth()
+
+  // ── Selected month (defaults to current, navigable backwards) ────
+  const [month, setMonth] = useState(currentMonth())
+  const isCurrentMonth = month === currentMonth()
+
   const { income, expenses } = finance.getMonthlyTotals(month)
   const netSavings = income - expenses
   const savingsRate = income > 0 ? (netSavings / income) * 100 : 0
 
   const categoryBreakdown = finance.getCategoryBreakdown(month)
-  const recentTxs = finance.getRecentTransactions(6)
+
+  // Show recent transactions for the selected month (latest 6)
+  const recentTxs = transactions
+    .filter(tx => tx.date.startsWith(month))
+    .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt))
+    .slice(0, 6)
+
   const topGoals = goals
     .filter(g => g.saved < g.target)
     .sort((a, b) => b.saved / b.target - a.saved / a.target)
@@ -118,16 +141,84 @@ export function Dashboard({ accounts, transactions, goals, budgets, settings, on
 
   return (
     <div style={{ padding: pad, maxWidth: '1200px' }}>
-      {/* Page title */}
-      <h1 style={{
-        margin: '0 0 28px 0',
-        fontFamily: "'Syne', sans-serif",
-        fontWeight: 800,
-        fontSize: isMobile ? '20px' : '24px',
-        color: '#eeeef8',
+      {/* Page title + month navigator */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '28px',
+        flexWrap: 'wrap',
+        gap: '12px',
       }}>
-        Dashboard
-      </h1>
+        <h1 style={{
+          margin: 0,
+          fontFamily: "'Syne', sans-serif",
+          fontWeight: 800,
+          fontSize: isMobile ? '20px' : '24px',
+          color: '#eeeef8',
+        }}>
+          Dashboard
+        </h1>
+
+        {/* Month navigator pill */}
+        <div style={{
+          display:      'flex',
+          alignItems:   'center',
+          gap:          '4px',
+          background:   '#0c0c1e',
+          border:       '1px solid #18183a',
+          borderRadius: '8px',
+          padding:      '4px',
+        }}>
+          <button
+            onClick={() => setMonth(m => shiftMonth(m, -1))}
+            title="Mes anterior"
+            style={{
+              width: '30px', height: '30px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: '#8b5cf6', fontSize: '18px', borderRadius: '6px',
+              transition: 'background 0.12s',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = '#8b5cf618')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+          >
+            ‹
+          </button>
+
+          <span style={{
+            minWidth:   isMobile ? '120px' : '140px',
+            textAlign:  'center',
+            fontSize:   '13px',
+            fontWeight: 600,
+            color:      isCurrentMonth ? '#eeeef8' : '#8b5cf6',
+            fontFamily: "'IBM Plex Mono', monospace",
+            textTransform: 'capitalize',
+            padding:    '0 4px',
+          }}>
+            {formatMonthLabel(month)}
+          </span>
+
+          <button
+            onClick={() => setMonth(m => shiftMonth(m, +1))}
+            disabled={isCurrentMonth}
+            title="Mes siguiente"
+            style={{
+              width: '30px', height: '30px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'none', border: 'none',
+              cursor:  isCurrentMonth ? 'default' : 'pointer',
+              color:   isCurrentMonth ? '#2a2a4a' : '#8b5cf6',
+              fontSize: '18px', borderRadius: '6px',
+              transition: 'background 0.12s',
+            }}
+            onMouseEnter={e => { if (!isCurrentMonth) e.currentTarget.style.background = '#8b5cf618' }}
+            onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+          >
+            ›
+          </button>
+        </div>
+      </div>
 
       {/* KPI Cards — 2 columns on mobile, 4 on desktop */}
       <div style={{
@@ -146,14 +237,14 @@ export function Dashboard({ accounts, transactions, goals, budgets, settings, on
         <KPICard
           title="Ingresos del mes"
           value={formatUSD(income)}
-          subtitle={month}
+          subtitle={formatMonthLabel(month)}
           accentColor="#10d97a"
           icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>}
         />
         <KPICard
           title="Gastos del mes"
           value={formatUSD(expenses)}
-          subtitle={month}
+          subtitle={formatMonthLabel(month)}
           accentColor="#f43f5e"
           icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>}
         />
@@ -203,7 +294,7 @@ export function Dashboard({ accounts, transactions, goals, budgets, settings, on
           {section('Gastos por categoría')}
           {categoryBreakdown.length === 0 ? (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: isMobile ? '160px' : '220px', color: '#6b6b9e', fontSize: '13px' }}>
-              Sin gastos este mes
+              Sin gastos en {formatMonthLabel(month)}
             </div>
           ) : (
             <ResponsiveContainer width="100%" height={isMobile ? 200 : 220}>
@@ -297,11 +388,14 @@ export function Dashboard({ accounts, transactions, goals, budgets, settings, on
 
         {/* Recent Transactions */}
         <div style={{ background: '#0c0c1e', border: '1px solid #18183a', borderRadius: '10px', padding: '20px' }}>
-          {section('Últimas transacciones', { label: 'Ver todas', onClick: () => onNavigate('transactions') })}
+          {section(
+            isCurrentMonth ? 'Últimas transacciones' : `Transacciones · ${formatMonthLabel(month)}`,
+            { label: 'Ver todas', onClick: () => onNavigate('transactions') },
+          )}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {recentTxs.length === 0 ? (
               <div style={{ color: '#6b6b9e', fontSize: '13px', textAlign: 'center', padding: '20px 0' }}>
-                Sin transacciones
+                Sin transacciones en {formatMonthLabel(month)}
               </div>
             ) : recentTxs.map(tx => {
               const acc = accounts.find(a => a.id === tx.accountId)
