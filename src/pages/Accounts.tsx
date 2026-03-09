@@ -15,7 +15,8 @@ interface AccountsProps {
   settings: Settings
   getBalance: (id: string) => number
   getTransactionCount: (id: string) => number
-  onAdd: (account: Omit<Account, 'id' | 'createdAt'>) => void
+  onAdd:    (account: Omit<Account, 'id' | 'createdAt'>) => void
+  onUpdate: (id: string, data: Partial<Omit<Account, 'id' | 'createdAt'>>) => void
   onDelete: (id: string) => void
 }
 
@@ -27,7 +28,7 @@ const EMPTY_FORM = {
   color: ACCOUNT_COLORS[0] as string,
 }
 
-export function Accounts({ accounts, settings, getBalance, getTransactionCount, onAdd, onDelete }: AccountsProps) {
+export function Accounts({ accounts, settings, getBalance, getTransactionCount, onAdd, onUpdate, onDelete }: AccountsProps) {
   const isMobile = useIsMobile()
   const [modalOpen, setModalOpen] = useState(false)
   const [form, setForm] = useState(EMPTY_FORM)
@@ -121,6 +122,7 @@ export function Accounts({ accounts, settings, getBalance, getTransactionCount, 
               balance={getBalance(acc.id)}
               transactionCount={getTransactionCount(acc.id)}
               exchangeRate={settings.exchangeRate}
+              onEdit={onUpdate}
               onDelete={() => onDelete(acc.id)}
             />
           ))}

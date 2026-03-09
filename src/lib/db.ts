@@ -98,6 +98,17 @@ export async function addAccount(d: Omit<Account, 'id' | 'createdAt'>): Promise<
   return mapAccount(data as AccountRow)
 }
 
+export async function updateAccount(id: string, d: Partial<Omit<Account, 'id' | 'createdAt'>>): Promise<void> {
+  const patch: Record<string, unknown> = {}
+  if (d.name           !== undefined) patch.name            = d.name
+  if (d.type           !== undefined) patch.type            = d.type
+  if (d.currency       !== undefined) patch.currency        = d.currency
+  if (d.initialBalance !== undefined) patch.initial_balance = d.initialBalance
+  if (d.color          !== undefined) patch.color           = d.color
+  const { error } = await supabase.from('accounts').update(patch).eq('id', id)
+  if (error) console.error('updateAccount:', error)
+}
+
 export async function deleteAccount(id: string): Promise<void> {
   const { error } = await supabase.from('accounts').delete().eq('id', id)
   if (error) console.error('deleteAccount:', error)

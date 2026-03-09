@@ -60,10 +60,6 @@ export function Goals({ goals, onAdd, onUpdate, onDelete }: GoalsProps) {
     onUpdate(goalId, { saved: goal.saved + amount })
   }
 
-  const handleArchive = (goalId: string) => {
-    onDelete(goalId)
-  }
-
   const f = (key: keyof typeof form, value: string) =>
     setForm(prev => ({ ...prev, [key]: value }))
 
@@ -115,7 +111,8 @@ export function Goals({ goals, onAdd, onUpdate, onDelete }: GoalsProps) {
               key={goal.id}
               goal={goal}
               onAddFunds={handleAddFunds}
-              onArchive={handleArchive}
+              onEdit={onUpdate}
+              onDelete={onDelete}
             />
           ))}
         </div>

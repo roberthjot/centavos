@@ -1,31 +1,76 @@
-// Settings page — exchange rate, defaults, data management, app info
+// Settings page — exchange rate (manual + live API), defaults, data management, app info
 import { useState } from 'react'
 import { useIsMobile } from '../hooks/useIsMobile'
 import type { Account, Settings as SettingsType } from '../types'
 import { exportAllData, importAllData } from '../utils/storage'
 
+// DolarAPI Venezuela response shape
+interface DolarRate {
+  fuente:              string   // "BCV", "PARALELO", "PROMEDIO", etc.
+  nombre:              string
+  promedio:            number
+  compra?:             number
+  venta?:              number
+  fechaActualizacion?: string
+}
+
 interface SettingsProps {
-  settings: SettingsType
-  accounts: Account[]
+  settings:         SettingsType
+  accounts:         Account[]
   onUpdateSettings: (s: Partial<SettingsType>) => void
-  onClearData: () => void
-  onSignOut: () => void
+  onClearData:      () => void
+  onSignOut:        () => void
 }
 
 export function Settings({ settings, accounts, onUpdateSettings, onClearData, onSignOut }: SettingsProps) {
   const isMobile = useIsMobile()
-  const [rateInput, setRateInput] = useState(String(settings.exchangeRate))
-  const [rateSaved, setRateSaved] = useState(false)
-  const [clearConfirm, setClearConfirm] = useState(false)
-  const [importStatus, setImportStatus] = useState('')
 
+  // ── Exchange rate state ───────────────────────────────────
+  const [rateInput,     setRateInput]     = useState(String(settings.exchangeRate))
+  const [rateSaved,     setRateSaved]     = useState(false)
+  const [liveRates,     setLiveRates]     = useState<DolarRate[]>([])
+  const [fetchingRates, setFetchingRates] = useState(false)
+  const [fetchError,    setFetchError]    = useState('')
+
+  // ── Other state ───────────────────────────────────────────
+  const [clearConfirm,  setClearConfirm]  = useState(false)
+  const [importStatus,  setImportStatus]  = useState('')
+
+  // ── Handlers ──────────────────────────────────────────────
   const saveRate = () => {
     const n = parseFloat(rateInput)
     if (isNaN(n) || n <= 0) return
-    onUpdateSettings({
-      exchangeRate: n,
-      exchangeRateUpdatedAt: new Date().toISOString(),
-    })
+    onUpdateSettings({ exchangeRate: n, exchangeRateUpdatedAt: new Date().toISOString() })
+    setRateSaved(true)
+    setLiveRates([])
+    setTimeout(() => setRateSaved(false), 2000)
+  }
+
+  // Fetch live rates from ve.dolarapi.com — free, no API key required
+  const fetchLiveRates = async () => {
+    setFetchingRates(true)
+    setFetchError('')
+    setLiveRates([])
+    try {
+      const res  = await fetch('https://ve.dolarapi.com/v1/dolares')
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json() as DolarRate[]
+      // Show only sources with a valid promedio
+      setLiveRates(data.filter(r => r.promedio && r.promedio > 0))
+    } catch (err) {
+      setFetchError('No se pudo obtener el tipo de cambio. Intenta de nuevo.')
+      console.error('fetchLiveRates:', err)
+    } finally {
+      setFetchingRates(false)
+    }
+  }
+
+  // Apply a rate from the API results
+  const applyLiveRate = (rate: DolarRate) => {
+    const value = rate.promedio
+    setRateInput(String(value))
+    onUpdateSettings({ exchangeRate: value, exchangeRateUpdatedAt: new Date().toISOString() })
+    setLiveRates([])
     setRateSaved(true)
     setTimeout(() => setRateSaved(false), 2000)
   }
@@ -33,9 +78,9 @@ export function Settings({ settings, accounts, onUpdateSettings, onClearData, on
   const handleExport = () => {
     const data = exportAllData()
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a')
+    a.href     = url
     a.download = `centavos-backup-${new Date().toISOString().slice(0, 10)}.json`
     a.click()
     URL.revokeObjectURL(url)
@@ -59,83 +104,38 @@ export function Settings({ settings, accounts, onUpdateSettings, onClearData, on
   }
 
   const handleClear = () => {
-    if (!clearConfirm) {
-      setClearConfirm(true)
-      return
-    }
+    if (!clearConfirm) { setClearConfirm(true); return }
     onClearData()
     setClearConfirm(false)
   }
 
+  // ── UI helpers ────────────────────────────────────────────
   const sectionTitle = (text: string) => (
-    <h2 style={{
-      margin: '0 0 20px 0',
-      fontFamily: "'Syne', sans-serif",
-      fontWeight: 800,
-      fontSize: '16px',
-      color: '#eeeef8',
-      paddingBottom: '12px',
-      borderBottom: '1px solid #18183a',
-    }}>
+    <h2 style={{ margin: '0 0 20px 0', fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: '16px', color: '#eeeef8', paddingBottom: '12px', borderBottom: '1px solid #18183a' }}>
       {text}
     </h2>
   )
 
   const card = (children: React.ReactNode) => (
-    <div style={{
-      background: '#0c0c1e',
-      border: '1px solid #18183a',
-      borderRadius: '10px',
-      padding: '24px',
-      marginBottom: '20px',
-    }}>
+    <div style={{ background: '#0c0c1e', border: '1px solid #18183a', borderRadius: '10px', padding: '24px', marginBottom: '20px' }}>
       {children}
     </div>
   )
 
-  const labelStyle: React.CSSProperties = {
-    fontSize: '12px',
-    color: '#6b6b9e',
-    display: 'block',
-    marginBottom: '6px',
-  }
-
-  const btnPrimary: React.CSSProperties = {
-    padding: '9px 18px',
-    background: '#8b5cf6',
-    color: '#eeeef8',
-    border: 'none',
-    borderRadius: '6px',
-    fontSize: '13px',
-    fontWeight: 600,
-    fontFamily: "'IBM Plex Mono', monospace",
-    cursor: 'pointer',
-  }
-
-  const btnSecondary: React.CSSProperties = {
-    padding: '9px 18px',
-    background: '#131328',
-    color: '#6b6b9e',
-    border: '1px solid #18183a',
-    borderRadius: '6px',
-    fontSize: '13px',
-    fontFamily: "'IBM Plex Mono', monospace",
-    cursor: 'pointer',
-  }
-
-  const btnDanger: React.CSSProperties = {
-    padding: '9px 18px',
-    background: clearConfirm ? '#f43f5e' : '#131328',
-    color: clearConfirm ? '#fff' : '#f43f5e',
-    border: `1px solid ${clearConfirm ? '#f43f5e' : '#f43f5e40'}`,
-    borderRadius: '6px',
-    fontSize: '13px',
-    fontFamily: "'IBM Plex Mono', monospace",
-    cursor: 'pointer',
-    transition: 'all 0.15s',
-  }
+  const labelStyle: React.CSSProperties  = { fontSize: '12px', color: '#6b6b9e', display: 'block', marginBottom: '6px' }
+  const btnPrimary: React.CSSProperties  = { padding: '9px 18px', background: '#8b5cf6', color: '#eeeef8', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, fontFamily: "'IBM Plex Mono', monospace", cursor: 'pointer' }
+  const btnSecondary: React.CSSProperties = { padding: '9px 18px', background: '#131328', color: '#6b6b9e', border: '1px solid #18183a', borderRadius: '6px', fontSize: '13px', fontFamily: "'IBM Plex Mono', monospace", cursor: 'pointer' }
+  const btnDanger: React.CSSProperties   = { padding: '9px 18px', background: clearConfirm ? '#f43f5e' : '#131328', color: clearConfirm ? '#fff' : '#f43f5e', border: `1px solid ${clearConfirm ? '#f43f5e' : '#f43f5e40'}`, borderRadius: '6px', fontSize: '13px', fontFamily: "'IBM Plex Mono', monospace", cursor: 'pointer', transition: 'all 0.15s' }
 
   const pad = isMobile ? '16px' : '32px'
+
+  // Source label mapping for display
+  const sourceName: Record<string, string> = {
+    BCV:       'BCV (oficial)',
+    PARALELO:  'Paralelo',
+    PROMEDIO:  'Promedio',
+    BCVDIGITAL:'BCV Digital',
+  }
 
   return (
     <div style={{ padding: pad, maxWidth: isMobile ? '100%' : '640px' }}>
@@ -143,76 +143,124 @@ export function Settings({ settings, accounts, onUpdateSettings, onClearData, on
         Configuración
       </h1>
 
-      {/* Exchange rate */}
+      {/* ── Exchange rate ─────────────────────────────────── */}
       {card(
         <>
           {sectionTitle('Tipo de cambio')}
+
+          {/* Manual input row */}
           <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', marginBottom: '10px' }}>
             <div style={{ flex: 1 }}>
               <label style={labelStyle}>1 USD =</label>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <input
-                  type="number"
-                  value={rateInput}
-                  onChange={e => setRateInput(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') saveRate() }}
-                  min="0.01"
-                  step="0.01"
-                  style={{ flex: 1 }}
-                />
+                <input type="number" value={rateInput} onChange={e => setRateInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') saveRate() }} min="0.01" step="0.01" style={{ flex: 1 }} />
                 <span style={{ color: '#6b6b9e', fontSize: '14px', flexShrink: 0 }}>VES</span>
               </div>
             </div>
-            <button
-              onClick={saveRate}
-              style={{ ...btnPrimary, background: rateSaved ? '#10d97a' : '#8b5cf6' }}
-            >
+            <button onClick={saveRate} style={{ ...btnPrimary, background: rateSaved ? '#10d97a' : '#8b5cf6' }}>
               {rateSaved ? '✓ Guardado' : 'Guardar'}
             </button>
           </div>
+
           {settings.exchangeRateUpdatedAt && (
-            <div style={{ fontSize: '11px', color: '#6b6b9e' }}>
+            <div style={{ fontSize: '11px', color: '#6b6b9e', marginBottom: '12px' }}>
               Actualizado: {new Date(settings.exchangeRateUpdatedAt).toLocaleString('es-VE')}
             </div>
           )}
-          <div style={{ fontSize: '12px', color: '#6b6b9e', marginTop: '8px' }}>
-            Actualiza este valor manualmente según el tipo de cambio oficial o de tu preferencia.
+
+          {/* Live rates button */}
+          <button
+            onClick={fetchLiveRates}
+            disabled={fetchingRates}
+            style={{ ...btnSecondary, display: 'flex', alignItems: 'center', gap: '6px', opacity: fetchingRates ? 0.6 : 1 }}
+          >
+            {fetchingRates ? '⏳ Consultando...' : '🌐 Obtener tasa en tiempo real'}
+          </button>
+
+          {fetchError && (
+            <div style={{ marginTop: '10px', fontSize: '12px', color: '#f43f5e', padding: '8px 12px', background: '#f43f5e12', border: '1px solid #f43f5e30', borderRadius: '6px' }}>
+              {fetchError}
+            </div>
+          )}
+
+          {/* Live rates results */}
+          {liveRates.length > 0 && (
+            <div style={{ marginTop: '14px' }}>
+              <div style={{ fontSize: '12px', color: '#6b6b9e', marginBottom: '8px' }}>
+                Selecciona la tasa que quieres usar:
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {liveRates.map(rate => (
+                  <button
+                    key={rate.fuente}
+                    onClick={() => applyLiveRate(rate)}
+                    style={{
+                      display:        'flex',
+                      justifyContent: 'space-between',
+                      alignItems:     'center',
+                      padding:        '12px 14px',
+                      background:     '#131328',
+                      border:         '1px solid #18183a',
+                      borderRadius:   '8px',
+                      cursor:         'pointer',
+                      textAlign:      'left',
+                      transition:     'border-color 0.15s',
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.borderColor = '#8b5cf6')}
+                    onMouseLeave={e => (e.currentTarget.style.borderColor = '#18183a')}
+                  >
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: 600, color: '#eeeef8' }}>
+                        {sourceName[rate.fuente] ?? rate.nombre}
+                      </div>
+                      {rate.fechaActualizacion && (
+                        <div style={{ fontSize: '11px', color: '#6b6b9e', marginTop: '2px' }}>
+                          {new Date(rate.fechaActualizacion).toLocaleString('es-VE')}
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: '16px', fontWeight: 700, color: '#8b5cf6', fontFamily: "'IBM Plex Mono', monospace" }}>
+                        {rate.promedio.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Bs
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#6b6b9e' }}>por dólar · click para usar</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div style={{ fontSize: '12px', color: '#6b6b9e', marginTop: '12px' }}>
+            Tasa obtenida de <strong style={{ color: '#a0a0c8' }}>ve.dolarapi.com</strong> — incluye tasa BCV oficial y tasa paralela.
           </div>
         </>,
       )}
 
-      {/* Defaults */}
+      {/* ── Defaults ──────────────────────────────────────── */}
       {card(
         <>
           {sectionTitle('Preferencias por defecto')}
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '16px' }}>
             <div>
               <label style={labelStyle}>Moneda predeterminada</label>
-              <select
-                value={settings.defaultCurrency}
-                onChange={e => onUpdateSettings({ defaultCurrency: e.target.value as 'USD' | 'VES' })}
-              >
+              <select value={settings.defaultCurrency} onChange={e => onUpdateSettings({ defaultCurrency: e.target.value as 'USD' | 'VES' })}>
                 <option value="USD">USD — Dólar americano</option>
                 <option value="VES">VES — Bolívar venezolano</option>
               </select>
             </div>
             <div>
               <label style={labelStyle}>Cuenta predeterminada</label>
-              <select
-                value={settings.defaultAccountId}
-                onChange={e => onUpdateSettings({ defaultAccountId: e.target.value })}
-              >
+              <select value={settings.defaultAccountId} onChange={e => onUpdateSettings({ defaultAccountId: e.target.value })}>
                 <option value="">Sin predeterminada</option>
-                {accounts.map(a => (
-                  <option key={a.id} value={a.id}>{a.name}</option>
-                ))}
+                {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
               </select>
             </div>
           </div>
         </>,
       )}
 
-      {/* Data management */}
+      {/* ── Data management ───────────────────────────────── */}
       {card(
         <>
           {sectionTitle('Gestión de datos')}
@@ -222,9 +270,7 @@ export function Settings({ settings, accounts, onUpdateSettings, onClearData, on
                 <div style={{ fontSize: '13px', color: '#eeeef8', marginBottom: '2px' }}>Exportar datos</div>
                 <div style={{ fontSize: '12px', color: '#6b6b9e' }}>Descarga un backup completo como JSON</div>
               </div>
-              <button onClick={handleExport} style={btnSecondary}>
-                Exportar JSON
-              </button>
+              <button onClick={handleExport} style={btnSecondary}>Exportar JSON</button>
             </div>
 
             <div style={{ borderTop: '1px solid #18183a', paddingTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -234,12 +280,7 @@ export function Settings({ settings, accounts, onUpdateSettings, onClearData, on
               </div>
               <label style={{ ...btnSecondary, display: 'inline-block', textAlign: 'center' }}>
                 Importar JSON
-                <input
-                  type="file"
-                  accept=".json"
-                  onChange={handleImport}
-                  style={{ display: 'none' }}
-                />
+                <input type="file" accept=".json" onChange={handleImport} style={{ display: 'none' }} />
               </label>
             </div>
 
@@ -257,41 +298,31 @@ export function Settings({ settings, accounts, onUpdateSettings, onClearData, on
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '8px' }}>
-                {clearConfirm && (
-                  <button onClick={() => setClearConfirm(false)} style={btnSecondary}>
-                    No
-                  </button>
-                )}
-                <button onClick={handleClear} style={btnDanger}>
-                  {clearConfirm ? 'Sí, borrar' : 'Borrar datos'}
-                </button>
+                {clearConfirm && <button onClick={() => setClearConfirm(false)} style={btnSecondary}>No</button>}
+                <button onClick={handleClear} style={btnDanger}>{clearConfirm ? 'Sí, borrar' : 'Borrar datos'}</button>
               </div>
             </div>
           </div>
         </>,
       )}
 
-      {/* App info */}
+      {/* ── App info ──────────────────────────────────────── */}
       {card(
         <>
           {sectionTitle('Información')}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: '#6b6b9e' }}>Versión</span>
-              <span style={{ color: '#eeeef8' }}>1.1.0</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: '#6b6b9e' }}>Tecnología</span>
-              <span style={{ color: '#eeeef8' }}>React 19 + Vite + TypeScript</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: '#6b6b9e' }}>Base de datos</span>
-              <span style={{ color: '#eeeef8' }}>Supabase (PostgreSQL)</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: '#6b6b9e' }}>Monedas</span>
-              <span style={{ color: '#eeeef8' }}>USD · VES</span>
-            </div>
+            {[
+              ['Versión',        '1.2.0'],
+              ['Tecnología',     'React 19 + Vite + TypeScript'],
+              ['Base de datos',  'Supabase (PostgreSQL)'],
+              ['Monedas',        'USD · VES'],
+              ['Tasa en vivo',   've.dolarapi.com'],
+            ].map(([label, value]) => (
+              <div key={label} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: '#6b6b9e' }}>{label}</span>
+                <span style={{ color: '#eeeef8' }}>{value}</span>
+              </div>
+            ))}
           </div>
           <div style={{ marginTop: '16px', fontSize: '12px', color: '#6b6b9e', lineHeight: 1.6 }}>
             CENTAVOS — App de finanzas personales para emprendedores venezolanos.
@@ -300,7 +331,7 @@ export function Settings({ settings, accounts, onUpdateSettings, onClearData, on
         </>,
       )}
 
-      {/* Sign out */}
+      {/* ── Sign out ──────────────────────────────────────── */}
       {card(
         <>
           {sectionTitle('Sesión')}
@@ -309,9 +340,7 @@ export function Settings({ settings, accounts, onUpdateSettings, onClearData, on
               <div style={{ fontSize: '13px', color: '#eeeef8', marginBottom: '2px' }}>Cerrar sesión</div>
               <div style={{ fontSize: '12px', color: '#6b6b9e' }}>Salir de tu cuenta en este dispositivo</div>
             </div>
-            <button onClick={onSignOut} style={btnSecondary}>
-              Cerrar sesión
-            </button>
+            <button onClick={onSignOut} style={btnSecondary}>Cerrar sesión</button>
           </div>
         </>,
       )}

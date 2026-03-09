@@ -138,6 +138,11 @@ export default function App() {
     if (account) setAccounts(prev => [...prev, account])
   }, [])
 
+  const updateAccount = useCallback(async (id: string, data: Partial<Omit<Account, 'id' | 'createdAt'>>) => {
+    await db.updateAccount(id, data)
+    setAccounts(prev => prev.map(a => a.id === id ? { ...a, ...data } : a))
+  }, [])
+
   const deleteAccount = useCallback(async (id: string) => {
     await db.deleteAccount(id)
     setAccounts(prev => prev.filter(a => a.id !== id))
@@ -253,7 +258,7 @@ export default function App() {
             accounts={accounts} settings={settings}
             getBalance={finance.getAccountBalance}
             getTransactionCount={finance.getTransactionCount}
-            onAdd={addAccount} onDelete={deleteAccount}
+            onAdd={addAccount} onUpdate={updateAccount} onDelete={deleteAccount}
           />
         )
       case 'settings':
