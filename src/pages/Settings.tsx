@@ -33,8 +33,11 @@ export function Settings({ settings, accounts, onUpdateSettings, onClearData, on
   const [fetchError,    setFetchError]    = useState('')
 
   // ── Custom categories state ───────────────────────────────
-  const [newExpenseCat, setNewExpenseCat] = useState('')
-  const [newIncomeCat,  setNewIncomeCat]  = useState('')
+  const [newExpenseCat,   setNewExpenseCat]   = useState('')
+  const [newIncomeCat,    setNewIncomeCat]    = useState('')
+  // Inline edit: tracks which item is being edited { idx, val }
+  const [editingExpense, setEditingExpense] = useState<{ idx: number; val: string } | null>(null)
+  const [editingIncome,  setEditingIncome]  = useState<{ idx: number; val: string } | null>(null)
 
   // ── Other state ───────────────────────────────────────────
   const [clearConfirm,  setClearConfirm]  = useState(false)
@@ -107,6 +110,37 @@ export function Settings({ settings, accounts, onUpdateSettings, onClearData, on
   const removeIncomeCategory = (name: string) => {
     const current = settings.customIncomeCategories ?? []
     onUpdateSettings({ customIncomeCategories: current.filter(c => c !== name) })
+  }
+
+  // Save edited expense category — renames the item at editingExpense.idx
+  const saveExpenseCategoryEdit = () => {
+    if (!editingExpense) return
+    const newName = editingExpense.val.trim()
+    const current = settings.customExpenseCategories ?? []
+    const original = current[editingExpense.idx]
+    // Cancel if empty, unchanged, or duplicate
+    if (!newName || newName === original || current.some((c, i) => c === newName && i !== editingExpense.idx)) {
+      setEditingExpense(null)
+      return
+    }
+    const updated = current.map((c, i) => (i === editingExpense.idx ? newName : c))
+    onUpdateSettings({ customExpenseCategories: updated })
+    setEditingExpense(null)
+  }
+
+  // Save edited income category — renames the item at editingIncome.idx
+  const saveIncomeCategoryEdit = () => {
+    if (!editingIncome) return
+    const newName = editingIncome.val.trim()
+    const current = settings.customIncomeCategories ?? []
+    const original = current[editingIncome.idx]
+    if (!newName || newName === original || current.some((c, i) => c === newName && i !== editingIncome.idx)) {
+      setEditingIncome(null)
+      return
+    }
+    const updated = current.map((c, i) => (i === editingIncome.idx ? newName : c))
+    onUpdateSettings({ customIncomeCategories: updated })
+    setEditingIncome(null)
   }
 
   const handleExport = () => {
@@ -336,35 +370,98 @@ export function Settings({ settings, accounts, onUpdateSettings, onClearData, on
                     Sin categorías personalizadas
                   </div>
                 ) : (
-                  (settings.customExpenseCategories ?? []).map(cat => (
-                    <div
-                      key={cat}
-                      style={{
-                        display:        'flex',
-                        justifyContent: 'space-between',
-                        alignItems:     'center',
-                        padding:        '8px 12px',
-                        background:     '#131328',
-                        border:         '1px solid #18183a',
-                        borderRadius:   '6px',
-                      }}
-                    >
-                      <span style={{ fontSize: '13px', color: '#eeeef8' }}>🔖 {cat}</span>
-                      <button
-                        onClick={() => removeExpenseCategory(cat)}
-                        title={`Eliminar "${cat}"`}
-                        style={{
-                          background: 'none', border: 'none', cursor: 'pointer',
-                          color: '#6b6b9e', fontSize: '16px', padding: '0 4px',
-                          lineHeight: 1,
-                        }}
-                        onMouseEnter={e => (e.currentTarget.style.color = '#f43f5e')}
-                        onMouseLeave={e => (e.currentTarget.style.color = '#6b6b9e')}
+                  (settings.customExpenseCategories ?? []).map((cat, idx) =>
+                    editingExpense?.idx === idx ? (
+                      /* ── Inline edit row ── */
+                      <div
+                        key={cat}
+                        style={{ display: 'flex', gap: '6px', alignItems: 'center' }}
                       >
-                        ×
-                      </button>
-                    </div>
-                  ))
+                        <input
+                          autoFocus
+                          type="text"
+                          value={editingExpense.val}
+                          onChange={e => setEditingExpense({ idx, val: e.target.value })}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter')  saveExpenseCategoryEdit()
+                            if (e.key === 'Escape') setEditingExpense(null)
+                          }}
+                          maxLength={30}
+                          style={{ flex: 1, fontSize: '13px' }}
+                        />
+                        {/* Confirm */}
+                        <button
+                          onClick={saveExpenseCategoryEdit}
+                          title="Confirmar"
+                          style={{
+                            background: '#f43f5e', border: 'none', borderRadius: '6px',
+                            color: '#fff', cursor: 'pointer', fontSize: '14px',
+                            padding: '6px 10px', lineHeight: 1,
+                          }}
+                        >
+                          ✓
+                        </button>
+                        {/* Cancel */}
+                        <button
+                          onClick={() => setEditingExpense(null)}
+                          title="Cancelar"
+                          style={{
+                            background: '#131328', border: '1px solid #18183a', borderRadius: '6px',
+                            color: '#6b6b9e', cursor: 'pointer', fontSize: '14px',
+                            padding: '6px 10px', lineHeight: 1,
+                          }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ) : (
+                      /* ── Normal row ── */
+                      <div
+                        key={cat}
+                        style={{
+                          display:        'flex',
+                          justifyContent: 'space-between',
+                          alignItems:     'center',
+                          padding:        '8px 12px',
+                          background:     '#131328',
+                          border:         '1px solid #18183a',
+                          borderRadius:   '6px',
+                        }}
+                      >
+                        <span style={{ fontSize: '13px', color: '#eeeef8' }}>🔖 {cat}</span>
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                          {/* Edit */}
+                          <button
+                            onClick={() => setEditingExpense({ idx, val: cat })}
+                            title={`Editar "${cat}"`}
+                            style={{
+                              background: 'none', border: 'none', cursor: 'pointer',
+                              color: '#6b6b9e', fontSize: '14px', padding: '0 5px',
+                              lineHeight: 1,
+                            }}
+                            onMouseEnter={e => (e.currentTarget.style.color = '#8b5cf6')}
+                            onMouseLeave={e => (e.currentTarget.style.color = '#6b6b9e')}
+                          >
+                            ✏
+                          </button>
+                          {/* Delete */}
+                          <button
+                            onClick={() => removeExpenseCategory(cat)}
+                            title={`Eliminar "${cat}"`}
+                            style={{
+                              background: 'none', border: 'none', cursor: 'pointer',
+                              color: '#6b6b9e', fontSize: '16px', padding: '0 4px',
+                              lineHeight: 1,
+                            }}
+                            onMouseEnter={e => (e.currentTarget.style.color = '#f43f5e')}
+                            onMouseLeave={e => (e.currentTarget.style.color = '#6b6b9e')}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  )
                 )}
               </div>
             </div>
@@ -402,35 +499,98 @@ export function Settings({ settings, accounts, onUpdateSettings, onClearData, on
                     Sin categorías personalizadas
                   </div>
                 ) : (
-                  (settings.customIncomeCategories ?? []).map(cat => (
-                    <div
-                      key={cat}
-                      style={{
-                        display:        'flex',
-                        justifyContent: 'space-between',
-                        alignItems:     'center',
-                        padding:        '8px 12px',
-                        background:     '#131328',
-                        border:         '1px solid #18183a',
-                        borderRadius:   '6px',
-                      }}
-                    >
-                      <span style={{ fontSize: '13px', color: '#eeeef8' }}>🔖 {cat}</span>
-                      <button
-                        onClick={() => removeIncomeCategory(cat)}
-                        title={`Eliminar "${cat}"`}
-                        style={{
-                          background: 'none', border: 'none', cursor: 'pointer',
-                          color: '#6b6b9e', fontSize: '16px', padding: '0 4px',
-                          lineHeight: 1,
-                        }}
-                        onMouseEnter={e => (e.currentTarget.style.color = '#f43f5e')}
-                        onMouseLeave={e => (e.currentTarget.style.color = '#6b6b9e')}
+                  (settings.customIncomeCategories ?? []).map((cat, idx) =>
+                    editingIncome?.idx === idx ? (
+                      /* ── Inline edit row ── */
+                      <div
+                        key={cat}
+                        style={{ display: 'flex', gap: '6px', alignItems: 'center' }}
                       >
-                        ×
-                      </button>
-                    </div>
-                  ))
+                        <input
+                          autoFocus
+                          type="text"
+                          value={editingIncome.val}
+                          onChange={e => setEditingIncome({ idx, val: e.target.value })}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter')  saveIncomeCategoryEdit()
+                            if (e.key === 'Escape') setEditingIncome(null)
+                          }}
+                          maxLength={30}
+                          style={{ flex: 1, fontSize: '13px' }}
+                        />
+                        {/* Confirm */}
+                        <button
+                          onClick={saveIncomeCategoryEdit}
+                          title="Confirmar"
+                          style={{
+                            background: '#10d97a', border: 'none', borderRadius: '6px',
+                            color: '#06060f', cursor: 'pointer', fontSize: '14px',
+                            padding: '6px 10px', lineHeight: 1, fontWeight: 700,
+                          }}
+                        >
+                          ✓
+                        </button>
+                        {/* Cancel */}
+                        <button
+                          onClick={() => setEditingIncome(null)}
+                          title="Cancelar"
+                          style={{
+                            background: '#131328', border: '1px solid #18183a', borderRadius: '6px',
+                            color: '#6b6b9e', cursor: 'pointer', fontSize: '14px',
+                            padding: '6px 10px', lineHeight: 1,
+                          }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ) : (
+                      /* ── Normal row ── */
+                      <div
+                        key={cat}
+                        style={{
+                          display:        'flex',
+                          justifyContent: 'space-between',
+                          alignItems:     'center',
+                          padding:        '8px 12px',
+                          background:     '#131328',
+                          border:         '1px solid #18183a',
+                          borderRadius:   '6px',
+                        }}
+                      >
+                        <span style={{ fontSize: '13px', color: '#eeeef8' }}>🔖 {cat}</span>
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                          {/* Edit */}
+                          <button
+                            onClick={() => setEditingIncome({ idx, val: cat })}
+                            title={`Editar "${cat}"`}
+                            style={{
+                              background: 'none', border: 'none', cursor: 'pointer',
+                              color: '#6b6b9e', fontSize: '14px', padding: '0 5px',
+                              lineHeight: 1,
+                            }}
+                            onMouseEnter={e => (e.currentTarget.style.color = '#8b5cf6')}
+                            onMouseLeave={e => (e.currentTarget.style.color = '#6b6b9e')}
+                          >
+                            ✏
+                          </button>
+                          {/* Delete */}
+                          <button
+                            onClick={() => removeIncomeCategory(cat)}
+                            title={`Eliminar "${cat}"`}
+                            style={{
+                              background: 'none', border: 'none', cursor: 'pointer',
+                              color: '#6b6b9e', fontSize: '16px', padding: '0 4px',
+                              lineHeight: 1,
+                            }}
+                            onMouseEnter={e => (e.currentTarget.style.color = '#f43f5e')}
+                            onMouseLeave={e => (e.currentTarget.style.color = '#6b6b9e')}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  )
                 )}
               </div>
             </div>
