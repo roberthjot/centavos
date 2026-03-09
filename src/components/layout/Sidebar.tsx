@@ -74,7 +74,7 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
           color: '#8b5cf6',
           letterSpacing: '0.08em',
         }}>
-          CENTAVOS
+          🪙 CENTAVOS
         </div>
         <div style={{ fontSize: '11px', color: '#6b6b9e', marginTop: '2px' }}>
           Finanzas Personales

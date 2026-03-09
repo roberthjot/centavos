@@ -58,7 +58,7 @@ export function Login() {
             color: '#8b5cf6',
             letterSpacing: '0.05em',
           }}>
-            CENTAVOS
+            🪙 CENTAVOS
           </div>
           <div style={{ fontSize: '13px', color: '#6b6b9e', marginTop: '4px' }}>
             Finanzas personales · USD &amp; VES

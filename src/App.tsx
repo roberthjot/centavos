@@ -28,7 +28,7 @@ function LoadingScreen() {
         fontFamily: "'Syne', sans-serif", fontWeight: 800,
         fontSize: '28px', color: '#8b5cf6',
       }}>
-        CENTAVOS
+        🪙 CENTAVOS
       </div>
       <div style={{ fontSize: '13px', color: '#6b6b9e' }}>Cargando...</div>
     </div>
