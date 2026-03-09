@@ -3,6 +3,12 @@ import { useState, useMemo } from 'react'
 import type { Transaction, Account, Settings } from '../types'
 import { formatUSD, formatAmount, toUSD, currentMonth } from '../utils/currency'
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, CATEGORY_EMOJI } from '../utils/constants'
+
+// Merge default categories with user-defined custom ones (deduped, custom appended at end)
+function mergeCategories(defaults: readonly string[], customs: string[]): string[] {
+  const set = new Set(defaults)
+  return [...defaults, ...customs.filter(c => !set.has(c))]
+}
 import { useIsMobile } from '../hooks/useIsMobile'
 import { Modal } from '../components/ui/Modal'
 import { TypeSelector } from '../components/ui/TypeSelector'
@@ -45,6 +51,17 @@ const TYPE_SIGN: Record<Transaction['type'], string> = {
 
 export function Transactions({ accounts, transactions, settings, onAdd, onUpdate, onDelete }: TransactionsProps) {
   const isMobile = useIsMobile()
+
+  // Combine default + custom categories (recomputed whenever settings change)
+  const allExpenseCategories = useMemo(
+    () => mergeCategories(EXPENSE_CATEGORIES, settings.customExpenseCategories ?? []),
+    [settings.customExpenseCategories],
+  )
+  const allIncomeCategories = useMemo(
+    () => mergeCategories(INCOME_CATEGORIES, settings.customIncomeCategories ?? []),
+    [settings.customIncomeCategories],
+  )
+
   const [filterMonth, setFilterMonth] = useState(currentMonth())
   const [filterType, setFilterType] = useState<'all' | Transaction['type']>('all')
   const [filterCategory, setFilterCategory] = useState('')
@@ -234,8 +251,8 @@ export function Transactions({ accounts, transactions, settings, onAdd, onUpdate
         </select>
         <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)} style={{ width: '100%' }}>
           <option value="">Todas las categorías</option>
-          {INCOME_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-          {EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+          {allIncomeCategories.map(c => <option key={c} value={c}>{c}</option>)}
+          {allExpenseCategories.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
         <select value={filterAccount} onChange={e => setFilterAccount(e.target.value)} style={{ width: '100%' }}>
           <option value="">Todas las cuentas</option>
@@ -389,8 +406,8 @@ export function Transactions({ accounts, transactions, settings, onAdd, onUpdate
               {inputLabel('Categoría')}
               <select value={form.category} onChange={e => f('category', e.target.value)}>
                 <option value="">Seleccionar...</option>
-                {(form.type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).map(c => (
-                  <option key={c} value={c}>{CATEGORY_EMOJI[c] ?? ''} {c}</option>
+                {(form.type === 'income' ? allIncomeCategories : allExpenseCategories).map(c => (
+                  <option key={c} value={c}>{CATEGORY_EMOJI[c] ?? '🔖'} {c}</option>
                 ))}
               </select>
             </>,

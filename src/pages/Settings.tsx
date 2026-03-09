@@ -32,6 +32,10 @@ export function Settings({ settings, accounts, onUpdateSettings, onClearData, on
   const [fetchingRates, setFetchingRates] = useState(false)
   const [fetchError,    setFetchError]    = useState('')
 
+  // ── Custom categories state ───────────────────────────────
+  const [newExpenseCat, setNewExpenseCat] = useState('')
+  const [newIncomeCat,  setNewIncomeCat]  = useState('')
+
   // ── Other state ───────────────────────────────────────────
   const [clearConfirm,  setClearConfirm]  = useState(false)
   const [importStatus,  setImportStatus]  = useState('')
@@ -73,6 +77,36 @@ export function Settings({ settings, accounts, onUpdateSettings, onClearData, on
     setLiveRates([])
     setRateSaved(true)
     setTimeout(() => setRateSaved(false), 2000)
+  }
+
+  // ── Custom category handlers ──────────────────────────────
+
+  const addExpenseCategory = () => {
+    const name = newExpenseCat.trim()
+    if (!name) return
+    const current = settings.customExpenseCategories ?? []
+    if (current.includes(name)) return  // no duplicates
+    onUpdateSettings({ customExpenseCategories: [...current, name] })
+    setNewExpenseCat('')
+  }
+
+  const removeExpenseCategory = (name: string) => {
+    const current = settings.customExpenseCategories ?? []
+    onUpdateSettings({ customExpenseCategories: current.filter(c => c !== name) })
+  }
+
+  const addIncomeCategory = () => {
+    const name = newIncomeCat.trim()
+    if (!name) return
+    const current = settings.customIncomeCategories ?? []
+    if (current.includes(name)) return  // no duplicates
+    onUpdateSettings({ customIncomeCategories: [...current, name] })
+    setNewIncomeCat('')
+  }
+
+  const removeIncomeCategory = (name: string) => {
+    const current = settings.customIncomeCategories ?? []
+    onUpdateSettings({ customIncomeCategories: current.filter(c => c !== name) })
   }
 
   const handleExport = () => {
@@ -255,6 +289,150 @@ export function Settings({ settings, accounts, onUpdateSettings, onClearData, on
                 <option value="">Sin predeterminada</option>
                 {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
               </select>
+            </div>
+          </div>
+        </>,
+      )}
+
+      {/* ── Custom categories ─────────────────────────────── */}
+      {card(
+        <>
+          {sectionTitle('Categorías personalizadas')}
+          <p style={{ margin: '0 0 20px 0', fontSize: '13px', color: '#6b6b9e', lineHeight: 1.6 }}>
+            Agrega tus propias categorías para gastos e ingresos. Aparecerán junto a las predeterminadas al registrar movimientos.
+          </p>
+
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '24px' }}>
+            {/* ── Expense custom categories ── */}
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: '#f43f5e', marginBottom: '12px' }}>
+                🔴 Gastos
+              </div>
+
+              {/* Add new */}
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                <input
+                  type="text"
+                  value={newExpenseCat}
+                  onChange={e => setNewExpenseCat(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') addExpenseCategory() }}
+                  placeholder="Nueva categoría..."
+                  style={{ flex: 1, fontSize: '13px' }}
+                  maxLength={30}
+                />
+                <button
+                  onClick={addExpenseCategory}
+                  style={{ ...btnPrimary, padding: '8px 14px', background: '#f43f5e', fontSize: '18px', lineHeight: 1 }}
+                  title="Agregar categoría de gasto"
+                >
+                  +
+                </button>
+              </div>
+
+              {/* List */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {(settings.customExpenseCategories ?? []).length === 0 ? (
+                  <div style={{ fontSize: '12px', color: '#6b6b9e', fontStyle: 'italic' }}>
+                    Sin categorías personalizadas
+                  </div>
+                ) : (
+                  (settings.customExpenseCategories ?? []).map(cat => (
+                    <div
+                      key={cat}
+                      style={{
+                        display:        'flex',
+                        justifyContent: 'space-between',
+                        alignItems:     'center',
+                        padding:        '8px 12px',
+                        background:     '#131328',
+                        border:         '1px solid #18183a',
+                        borderRadius:   '6px',
+                      }}
+                    >
+                      <span style={{ fontSize: '13px', color: '#eeeef8' }}>🔖 {cat}</span>
+                      <button
+                        onClick={() => removeExpenseCategory(cat)}
+                        title={`Eliminar "${cat}"`}
+                        style={{
+                          background: 'none', border: 'none', cursor: 'pointer',
+                          color: '#6b6b9e', fontSize: '16px', padding: '0 4px',
+                          lineHeight: 1,
+                        }}
+                        onMouseEnter={e => (e.currentTarget.style.color = '#f43f5e')}
+                        onMouseLeave={e => (e.currentTarget.style.color = '#6b6b9e')}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* ── Income custom categories ── */}
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: '#10d97a', marginBottom: '12px' }}>
+                🟢 Ingresos
+              </div>
+
+              {/* Add new */}
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                <input
+                  type="text"
+                  value={newIncomeCat}
+                  onChange={e => setNewIncomeCat(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') addIncomeCategory() }}
+                  placeholder="Nueva categoría..."
+                  style={{ flex: 1, fontSize: '13px' }}
+                  maxLength={30}
+                />
+                <button
+                  onClick={addIncomeCategory}
+                  style={{ ...btnPrimary, padding: '8px 14px', background: '#10d97a', fontSize: '18px', lineHeight: 1 }}
+                  title="Agregar categoría de ingreso"
+                >
+                  +
+                </button>
+              </div>
+
+              {/* List */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {(settings.customIncomeCategories ?? []).length === 0 ? (
+                  <div style={{ fontSize: '12px', color: '#6b6b9e', fontStyle: 'italic' }}>
+                    Sin categorías personalizadas
+                  </div>
+                ) : (
+                  (settings.customIncomeCategories ?? []).map(cat => (
+                    <div
+                      key={cat}
+                      style={{
+                        display:        'flex',
+                        justifyContent: 'space-between',
+                        alignItems:     'center',
+                        padding:        '8px 12px',
+                        background:     '#131328',
+                        border:         '1px solid #18183a',
+                        borderRadius:   '6px',
+                      }}
+                    >
+                      <span style={{ fontSize: '13px', color: '#eeeef8' }}>🔖 {cat}</span>
+                      <button
+                        onClick={() => removeIncomeCategory(cat)}
+                        title={`Eliminar "${cat}"`}
+                        style={{
+                          background: 'none', border: 'none', cursor: 'pointer',
+                          color: '#6b6b9e', fontSize: '16px', padding: '0 4px',
+                          lineHeight: 1,
+                        }}
+                        onMouseEnter={e => (e.currentTarget.style.color = '#f43f5e')}
+                        onMouseLeave={e => (e.currentTarget.style.color = '#6b6b9e')}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </div>
         </>,

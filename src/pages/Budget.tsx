@@ -1,5 +1,5 @@
 // Budget page — monthly budget cards with progress tracking
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import type { Budget, Transaction, Settings } from '../types'
 import { formatUSD, toUSD, currentMonth } from '../utils/currency'
 import { EXPENSE_CATEGORIES } from '../utils/constants'
@@ -22,6 +22,13 @@ export function Budget({ budgets, transactions, settings, onAdd, onDelete }: Bud
   const [month, setMonth] = useState(currentMonth())
   const [modalOpen, setModalOpen] = useState(false)
   const isMobile = useIsMobile()
+
+  // Combine default expense categories + user-defined ones (deduped)
+  const allExpenseCategories = useMemo(() => {
+    const customs = settings.customExpenseCategories ?? []
+    const set = new Set(EXPENSE_CATEGORIES as readonly string[])
+    return [...EXPENSE_CATEGORIES, ...customs.filter(c => !set.has(c))]
+  }, [settings.customExpenseCategories])
   const [form, setForm] = useState({
     category: '',
     limit: '',
@@ -165,7 +172,7 @@ export function Budget({ budgets, transactions, settings, onAdd, onDelete }: Bud
               onChange={e => setForm(p => ({ ...p, category: e.target.value }))}
             >
               <option value="">Seleccionar categoría...</option>
-              {EXPENSE_CATEGORIES
+              {allExpenseCategories
                 .filter(c => !monthBudgets.some(b => b.category === c))
                 .map(c => <option key={c} value={c}>{c}</option>)}
             </select>

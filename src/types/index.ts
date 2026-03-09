@@ -49,6 +49,8 @@ export interface Settings {
   defaultCurrency: 'USD' | 'VES'
   defaultAccountId: string
   exchangeRateUpdatedAt?: string
+  customExpenseCategories: string[]  // user-defined expense categories
+  customIncomeCategories:  string[]  // user-defined income categories
 }
 
 // Navigation pages

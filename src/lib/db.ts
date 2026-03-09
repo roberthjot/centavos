@@ -33,6 +33,8 @@ interface GoalRow {
 interface SettingsRow {
   user_id: string; exchange_rate: number; exchange_rate_updated_at: string | null
   default_currency: string; default_account_id: string | null
+  custom_expense_categories: string[] | null
+  custom_income_categories:  string[] | null
 }
 
 // ── Auth helper ───────────────────────────────────────────────
@@ -77,6 +79,8 @@ const mapSettings = (r: SettingsRow): Settings => ({
   exchangeRateUpdatedAt: r.exchange_rate_updated_at ?? undefined,
   defaultCurrency: r.default_currency as 'USD' | 'VES',
   defaultAccountId: r.default_account_id ?? '',
+  customExpenseCategories: r.custom_expense_categories ?? [],
+  customIncomeCategories:  r.custom_income_categories  ?? [],
 })
 
 // ── Accounts ─────────────────────────────────────────────────
@@ -231,6 +235,8 @@ export async function upsertSettings(s: Settings): Promise<void> {
     exchange_rate_updated_at: s.exchangeRateUpdatedAt ?? null,
     default_currency: s.defaultCurrency,
     default_account_id: s.defaultAccountId || null,
+    custom_expense_categories: s.customExpenseCategories ?? [],
+    custom_income_categories:  s.customIncomeCategories  ?? [],
   })
   if (error) console.error('upsertSettings:', error)
 }

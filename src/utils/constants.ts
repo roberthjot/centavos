@@ -108,7 +108,9 @@ export const DEFAULT_ACCOUNTS = [
 export const DEFAULT_SETTINGS = {
   exchangeRate: 40,
   defaultCurrency: 'USD' as const,
-  defaultAccountId: 'acc-1',
+  defaultAccountId: '',
+  customExpenseCategories: [] as string[],
+  customIncomeCategories:  [] as string[],
 }
 
 // ----- Category Emoji Map (for visual display) -----
