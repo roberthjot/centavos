@@ -4,7 +4,7 @@
 // snake_case DB columns ↔ camelCase TypeScript interfaces.
 // ============================================================
 import { supabase } from './supabase'
-import type { Account, Transaction, Budget, Goal, Settings } from '../types'
+import type { Account, Transaction, Budget, Goal, Debt, Settings } from '../types'
 
 // ── Row types (Supabase returns snake_case) ──────────────────
 
@@ -16,7 +16,9 @@ interface AccountRow {
 interface TransactionRow {
   id: string; user_id: string; account_id: string; to_account_id: string | null
   date: string; type: string; amount: number; currency: string
-  category: string; note: string | null; tags: string[] | null; created_at: string
+  category: string; note: string | null; tags: string[] | null
+  is_recurring: boolean | null; recurring_interval: string | null
+  created_at: string
 }
 
 interface BudgetRow {
@@ -28,6 +30,13 @@ interface GoalRow {
   id: string; user_id: string; name: string; emoji: string
   target: number; saved: number; currency: string
   deadline: string | null; note: string | null; created_at: string
+}
+
+interface DebtRow {
+  id: string; user_id: string; name: string; counterparty: string
+  amount: number; currency: string; type: string
+  due_date: string | null; note: string | null
+  status: string; paid_amount: number; created_at: string
 }
 
 interface SettingsRow {
@@ -59,6 +68,8 @@ const mapTransaction = (r: TransactionRow): Transaction => ({
   category: r.category, accountId: r.account_id,
   toAccountId: r.to_account_id ?? undefined,
   note: r.note ?? undefined, tags: r.tags ?? undefined,
+  isRecurring: r.is_recurring ?? false,
+  recurringInterval: r.recurring_interval as Transaction['recurringInterval'] ?? undefined,
   createdAt: r.created_at,
 })
 
@@ -71,6 +82,15 @@ const mapGoal = (r: GoalRow): Goal => ({
   id: r.id, name: r.name, emoji: r.emoji, target: r.target,
   saved: r.saved, currency: r.currency as 'USD' | 'VES',
   deadline: r.deadline ?? undefined, note: r.note ?? undefined,
+  createdAt: r.created_at,
+})
+
+const mapDebt = (r: DebtRow): Debt => ({
+  id: r.id, name: r.name, counterparty: r.counterparty,
+  amount: r.amount, currency: r.currency as 'USD' | 'VES',
+  type: r.type as Debt['type'],
+  dueDate: r.due_date ?? undefined, note: r.note ?? undefined,
+  status: r.status as Debt['status'], paidAmount: r.paid_amount,
   createdAt: r.created_at,
 })
 
@@ -133,6 +153,8 @@ export async function addTransaction(d: Omit<Transaction, 'id' | 'createdAt'>): 
     account_id: d.accountId, to_account_id: d.toAccountId ?? null,
     date: d.date, type: d.type, amount: d.amount, currency: d.currency,
     category: d.category, note: d.note ?? null, tags: d.tags ?? null,
+    is_recurring: d.isRecurring ?? false,
+    recurring_interval: d.recurringInterval ?? null,
   }).select().single()
   if (error) { console.error('addTransaction:', error); return null }
   return mapTransaction(data as TransactionRow)
@@ -140,15 +162,17 @@ export async function addTransaction(d: Omit<Transaction, 'id' | 'createdAt'>): 
 
 export async function updateTransaction(id: string, d: Partial<Transaction>): Promise<void> {
   const patch: Record<string, unknown> = {}
-  if (d.date !== undefined)        patch.date           = d.date
-  if (d.type !== undefined)        patch.type           = d.type
-  if (d.amount !== undefined)      patch.amount         = d.amount
-  if (d.currency !== undefined)    patch.currency       = d.currency
-  if (d.category !== undefined)    patch.category       = d.category
-  if (d.accountId !== undefined)   patch.account_id     = d.accountId
-  if (d.toAccountId !== undefined) patch.to_account_id  = d.toAccountId
-  if (d.note !== undefined)        patch.note           = d.note
-  if (d.tags !== undefined)        patch.tags           = d.tags
+  if (d.date              !== undefined) patch.date               = d.date
+  if (d.type              !== undefined) patch.type               = d.type
+  if (d.amount            !== undefined) patch.amount             = d.amount
+  if (d.currency          !== undefined) patch.currency           = d.currency
+  if (d.category          !== undefined) patch.category           = d.category
+  if (d.accountId         !== undefined) patch.account_id         = d.accountId
+  if (d.toAccountId       !== undefined) patch.to_account_id      = d.toAccountId
+  if (d.note              !== undefined) patch.note               = d.note
+  if (d.tags              !== undefined) patch.tags               = d.tags
+  if (d.isRecurring       !== undefined) patch.is_recurring       = d.isRecurring
+  if (d.recurringInterval !== undefined) patch.recurring_interval = d.recurringInterval
   const { error } = await supabase.from('transactions').update(patch).eq('id', id)
   if (error) console.error('updateTransaction:', error)
 }
@@ -216,6 +240,47 @@ export async function updateGoal(id: string, d: Partial<Goal>): Promise<void> {
 export async function deleteGoal(id: string): Promise<void> {
   const { error } = await supabase.from('goals').delete().eq('id', id)
   if (error) console.error('deleteGoal:', error)
+}
+
+// ── Debts ────────────────────────────────────────────────────
+
+export async function getDebts(): Promise<Debt[]> {
+  const { data, error } = await supabase
+    .from('debts').select('*').order('created_at', { ascending: false })
+  if (error) { console.error('getDebts:', error); return [] }
+  return (data as DebtRow[]).map(mapDebt)
+}
+
+export async function addDebt(d: Omit<Debt, 'id' | 'createdAt'>): Promise<Debt | null> {
+  const { data, error } = await supabase.from('debts').insert({
+    user_id: await uid(),
+    name: d.name, counterparty: d.counterparty,
+    amount: d.amount, currency: d.currency, type: d.type,
+    due_date: d.dueDate ?? null, note: d.note ?? null,
+    status: d.status, paid_amount: d.paidAmount,
+  }).select().single()
+  if (error) { console.error('addDebt:', error); return null }
+  return mapDebt(data as DebtRow)
+}
+
+export async function updateDebt(id: string, d: Partial<Debt>): Promise<void> {
+  const patch: Record<string, unknown> = {}
+  if (d.name         !== undefined) patch.name         = d.name
+  if (d.counterparty !== undefined) patch.counterparty = d.counterparty
+  if (d.amount       !== undefined) patch.amount       = d.amount
+  if (d.currency     !== undefined) patch.currency     = d.currency
+  if (d.type         !== undefined) patch.type         = d.type
+  if (d.dueDate      !== undefined) patch.due_date     = d.dueDate
+  if (d.note         !== undefined) patch.note         = d.note
+  if (d.status       !== undefined) patch.status       = d.status
+  if (d.paidAmount   !== undefined) patch.paid_amount  = d.paidAmount
+  const { error } = await supabase.from('debts').update(patch).eq('id', id)
+  if (error) console.error('updateDebt:', error)
+}
+
+export async function deleteDebt(id: string): Promise<void> {
+  const { error } = await supabase.from('debts').delete().eq('id', id)
+  if (error) console.error('deleteDebt:', error)
 }
 
 // ── Settings ─────────────────────────────────────────────────

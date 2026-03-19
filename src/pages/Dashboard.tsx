@@ -220,6 +220,44 @@ export function Dashboard({ accounts, transactions, goals, budgets, settings, on
         </div>
       </div>
 
+      {/* Budget alerts — show warnings for current month only */}
+      {isCurrentMonth && (() => {
+        const alerts = finance.getBudgetsWithProgress(month)
+          .filter(b => b.limitUSD > 0 && b.spent / b.limitUSD >= 0.8)
+          .sort((a, b) => b.spent / b.limitUSD - a.spent / a.limitUSD)
+        if (alerts.length === 0) return null
+        return (
+          <div style={{ marginBottom: '20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {alerts.map(b => {
+              const pct  = b.spent / b.limitUSD
+              const over = pct >= 1
+              return (
+                <div
+                  key={b.id}
+                  style={{
+                    padding: '10px 16px',
+                    background: over ? '#f43f5e10' : '#f59e0b10',
+                    border: `1px solid ${over ? '#f43f5e40' : '#f59e0b40'}`,
+                    borderRadius: '8px',
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    cursor: 'pointer',
+                  }}
+                  onClick={() => onNavigate('budget' as any)}
+                >
+                  <span style={{ fontSize: '13px', color: over ? '#f43f5e' : '#f59e0b' }}>
+                    {over ? '🚨' : '⚠️'} Presupuesto <strong>{b.category}</strong>
+                    {' — '}{over ? `excedido en ${formatUSD(b.spent - b.limitUSD)}` : `${Math.round(pct * 100)}% usado`}
+                  </span>
+                  <span style={{ fontSize: '11px', color: '#6b6b9e' }}>
+                    {formatUSD(b.spent)} / {formatUSD(b.limitUSD)}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        )
+      })()}
+
       {/* KPI Cards — 2 columns on mobile, 4 on desktop */}
       <div style={{
         display: 'grid',

@@ -21,6 +21,8 @@ export interface Transaction {
   toAccountId?: string  // only for transfers
   note?: string
   tags?: string[]
+  isRecurring?: boolean                                                  // repeats every month
+  recurringInterval?: 'weekly' | 'monthly' | 'yearly'                   // recurrence period
   createdAt: string
 }
 
@@ -44,6 +46,20 @@ export interface Goal {
   createdAt: string
 }
 
+export interface Debt {
+  id: string
+  name: string           // description of the debt
+  counterparty: string   // person or entity involved
+  amount: number         // total amount of the debt
+  currency: 'USD' | 'VES'
+  type: 'owed_by_me' | 'owed_to_me'  // I owe them vs they owe me
+  dueDate?: string       // YYYY-MM-DD
+  note?: string
+  status: 'pending' | 'partial' | 'paid'
+  paidAmount: number     // amount already paid/collected
+  createdAt: string
+}
+
 export interface Settings {
   exchangeRate: number       // 1 USD = X VES, manually set by user
   defaultCurrency: 'USD' | 'VES'
@@ -54,4 +70,12 @@ export interface Settings {
 }
 
 // Navigation pages
-export type Page = 'dashboard' | 'transactions' | 'budget' | 'goals' | 'accounts' | 'settings'
+export type Page =
+  | 'dashboard'
+  | 'transactions'
+  | 'budget'
+  | 'goals'
+  | 'accounts'
+  | 'debts'
+  | 'annual'
+  | 'settings'

@@ -1,7 +1,7 @@
-// Accounts page — account cards grid with add/delete and wealth summary
+// Accounts page — account cards grid with add/delete, wealth summary, and balance history chart
 import { useState } from 'react'
-import type { Account, Settings } from '../types'
-import { formatUSD, toUSD } from '../utils/currency'
+import type { Account, Transaction, Settings } from '../types'
+import { formatUSD, formatAmount, toUSD } from '../utils/currency'
 import { ACCOUNT_TYPES, ACCOUNT_COLORS } from '../utils/constants'
 import { useIsMobile } from '../hooks/useIsMobile'
 import { Modal } from '../components/ui/Modal'
@@ -9,9 +9,12 @@ import { AccountCard } from '../components/ui/AccountCard'
 import { ColorPicker } from '../components/ui/ColorPicker'
 import { CurrencyInput } from '../components/ui/CurrencyInput'
 import { EmptyState } from '../components/ui/EmptyState'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { useFinance } from '../hooks/useFinance'
 
 interface AccountsProps {
   accounts: Account[]
+  transactions: Transaction[]
   settings: Settings
   getBalance: (id: string) => number
   getTransactionCount: (id: string) => number
@@ -28,10 +31,14 @@ const EMPTY_FORM = {
   color: ACCOUNT_COLORS[0] as string,
 }
 
-export function Accounts({ accounts, settings, getBalance, getTransactionCount, onAdd, onUpdate, onDelete }: AccountsProps) {
+export function Accounts({ accounts, transactions, settings, getBalance, getTransactionCount, onAdd, onUpdate, onDelete }: AccountsProps) {
   const isMobile = useIsMobile()
   const [modalOpen, setModalOpen] = useState(false)
   const [form, setForm] = useState(EMPTY_FORM)
+  const [showHistory, setShowHistory] = useState(false)
+
+  // Use finance hook to get balance history per account
+  const finance = useFinance(accounts, transactions, [], [], settings)
 
   const netWorth = accounts.reduce(
     (sum, acc) => sum + toUSD(getBalance(acc.id), acc.currency, settings.exchangeRate),
@@ -126,6 +133,83 @@ export function Accounts({ accounts, settings, getBalance, getTransactionCount, 
               onDelete={() => onDelete(acc.id)}
             />
           ))}
+        </div>
+      )}
+
+      {/* Balance history chart */}
+      {accounts.length > 0 && (
+        <div style={{ marginTop: '32px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <h2 style={{ margin: 0, fontSize: '15px', fontFamily: "'Syne', sans-serif", fontWeight: 800, color: '#eeeef8' }}>
+              Historial de saldos
+            </h2>
+            <button
+              onClick={() => setShowHistory(v => !v)}
+              style={{
+                fontSize: '12px', color: '#8b5cf6',
+                background: 'none', border: 'none', cursor: 'pointer',
+                fontFamily: "'IBM Plex Mono', monospace",
+              }}
+            >
+              {showHistory ? 'Ocultar ▲' : 'Ver gráfico ▼'}
+            </button>
+          </div>
+
+          {showHistory && (
+            <div style={{ background: '#0c0c1e', border: '1px solid #18183a', borderRadius: '10px', padding: '20px' }}>
+              <ResponsiveContainer width="100%" height={isMobile ? 200 : 260}>
+                <LineChart margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#18183a" />
+                  <XAxis
+                    dataKey="label"
+                    type="category"
+                    allowDuplicatedCategory={false}
+                    stroke="#6b6b9e"
+                    tick={{ fontSize: 10, fontFamily: "'IBM Plex Mono', monospace" }}
+                  />
+                  <YAxis
+                    stroke="#6b6b9e"
+                    tick={{ fontSize: 10, fontFamily: "'IBM Plex Mono', monospace" }}
+                    tickFormatter={v => `${v >= 0 ? '' : '-'}${Math.abs(v)}`}
+                  />
+                  <Tooltip
+                    contentStyle={{ background: '#131328', border: '1px solid #18183a', borderRadius: '8px', fontSize: '12px', fontFamily: "'IBM Plex Mono', monospace" }}
+                    labelStyle={{ color: '#6b6b9e' }}
+                    formatter={(value: any, name: any) => [formatAmount(Number(value), accounts.find(a => a.name === String(name))?.currency ?? 'USD'), String(name)]}
+                  />
+                  <Legend
+                    formatter={(value) => <span style={{ fontSize: '11px', color: '#6b6b9e' }}>{value}</span>}
+                  />
+                  {accounts.map(acc => {
+                    const history = finance.getAccountBalanceHistory(acc.id, 12)
+                    return (
+                      <Line
+                        key={acc.id}
+                        data={history}
+                        dataKey="balance"
+                        name={acc.name}
+                        stroke={acc.color}
+                        strokeWidth={2}
+                        dot={false}
+                        type="monotone"
+                      />
+                    )
+                  })}
+                </LineChart>
+              </ResponsiveContainer>
+              <div style={{ marginTop: '12px', display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+                {accounts.map(acc => (
+                  <div key={acc.id} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ width: '12px', height: '3px', background: acc.color, borderRadius: '2px' }} />
+                    <span style={{ fontSize: '11px', color: '#6b6b9e' }}>{acc.name}</span>
+                    <span style={{ fontSize: '11px', color: '#eeeef8', fontWeight: 600 }}>
+                      {formatAmount(getBalance(acc.id), acc.currency)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

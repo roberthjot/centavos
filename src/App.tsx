@@ -2,7 +2,7 @@
 // Auth via Supabase. All state loaded from DB after login.
 import { useState, useEffect, useCallback } from 'react'
 import type { User } from '@supabase/supabase-js'
-import type { Account, Transaction, Budget, Goal, Settings, Page } from './types'
+import type { Account, Transaction, Budget, Goal, Debt, Settings, Page } from './types'
 import { supabase } from './lib/supabase'
 import * as db from './lib/db'
 import { useFinance } from './hooks/useFinance'
@@ -14,6 +14,8 @@ import { Transactions } from './pages/Transactions'
 import { Budget as BudgetPage } from './pages/Budget'
 import { Goals } from './pages/Goals'
 import { Accounts } from './pages/Accounts'
+import { Debts } from './pages/Debts'
+import { Annual } from './pages/Annual'
 import { Settings as SettingsPage } from './pages/Settings'
 
 // ── Loading screen ────────────────────────────────────────────
@@ -46,6 +48,7 @@ export default function App() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [goals, setGoals]               = useState<Goal[]>([])
   const [budgets, setBudgets]           = useState<Budget[]>([])
+  const [debts, setDebts]               = useState<Debt[]>([])
   const [settings, setSettings]         = useState<Settings>(DEFAULT_SETTINGS)
 
   // ── Listen for auth changes ───────────────────────────────
@@ -103,6 +106,7 @@ export default function App() {
       setTransactions([])
       setGoals([])
       setBudgets([])
+      setDebts([])
       setSettings(DEFAULT_SETTINGS)
       return
     }
@@ -110,17 +114,19 @@ export default function App() {
   }, [user])
 
   const loadAllData = async () => {
-    const [accs, txs, gls, bgs, sett] = await Promise.all([
+    const [accs, txs, gls, bgs, dts, sett] = await Promise.all([
       db.getAccounts(),
       db.getTransactions(),
       db.getGoals(),
       db.getBudgets(),
+      db.getDebts(),
       db.getSettings(),
     ])
     setAccounts(accs)
     setTransactions(txs)
     setGoals(gls)
     setBudgets(bgs)
+    setDebts(dts)
     if (sett) {
       setSettings(sett)
     } else {
@@ -192,6 +198,22 @@ export default function App() {
     setBudgets(prev => prev.filter(b => b.id !== id))
   }, [])
 
+  // ── Debt CRUD ─────────────────────────────────────────────
+  const addDebt = useCallback(async (data: Omit<Debt, 'id' | 'createdAt'>) => {
+    const debt = await db.addDebt(data)
+    if (debt) setDebts(prev => [debt, ...prev])
+  }, [])
+
+  const updateDebt = useCallback(async (id: string, data: Partial<Debt>) => {
+    await db.updateDebt(id, data)
+    setDebts(prev => prev.map(d => d.id === id ? { ...d, ...data } : d))
+  }, [])
+
+  const deleteDebt = useCallback(async (id: string) => {
+    await db.deleteDebt(id)
+    setDebts(prev => prev.filter(d => d.id !== id))
+  }, [])
+
   // ── Settings update ───────────────────────────────────────
   const updateSettings = useCallback(async (partial: Partial<Settings>) => {
     const updated = { ...settings, ...partial }
@@ -206,14 +228,16 @@ export default function App() {
       ...accounts.map(a => db.deleteAccount(a.id)),
       ...goals.map(g => db.deleteGoal(g.id)),
       ...budgets.map(b => db.deleteBudget(b.id)),
+      ...debts.map(d => db.deleteDebt(d.id)),
     ])
     await db.upsertSettings(DEFAULT_SETTINGS)
     setAccounts([])
     setTransactions([])
     setGoals([])
     setBudgets([])
+    setDebts([])
     setSettings(DEFAULT_SETTINGS)
-  }, [accounts, goals, budgets])
+  }, [accounts, goals, budgets, debts])
 
   // ── Sign out ──────────────────────────────────────────────
   const handleSignOut = useCallback(async () => {
@@ -255,10 +279,24 @@ export default function App() {
       case 'accounts':
         return (
           <Accounts
-            accounts={accounts} settings={settings}
+            accounts={accounts} transactions={transactions} settings={settings}
             getBalance={finance.getAccountBalance}
             getTransactionCount={finance.getTransactionCount}
             onAdd={addAccount} onUpdate={updateAccount} onDelete={deleteAccount}
+          />
+        )
+      case 'debts':
+        return (
+          <Debts
+            debts={debts} settings={settings}
+            onAdd={addDebt} onUpdate={updateDebt} onDelete={deleteDebt}
+          />
+        )
+      case 'annual':
+        return (
+          <Annual
+            accounts={accounts} transactions={transactions}
+            goals={goals} budgets={budgets} settings={settings}
           />
         )
       case 'settings':

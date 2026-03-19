@@ -18,6 +18,12 @@ interface CategoryTotal {
   color: string
 }
 
+interface BalancePoint {
+  month: string       // YYYY-MM
+  label: string       // "Mar 25"
+  balance: number     // in account's native currency
+}
+
 // A fixed color palette for chart slices
 const PIE_COLORS = [
   '#8b5cf6', '#10d97a', '#f43f5e', '#f59e0b', '#38bdf8',
@@ -149,6 +155,50 @@ export function useFinance(
       }))
   }
 
+  /**
+   * Balance history for a single account over the last N months.
+   * Each point is the running balance at the END of that month.
+   * Uses only transactions up to and including that month.
+   */
+  const getAccountBalanceHistory = (accountId: string, numMonths = 12): BalancePoint[] => {
+    const account = accounts.find(a => a.id === accountId)
+    if (!account) return []
+
+    return Array.from({ length: numMonths }, (_, i) => {
+      const month = monthsAgo(numMonths - 1 - i)
+      // Include all transactions up to the end of this month
+      let balance = account.initialBalance
+      for (const tx of transactions) {
+        if (tx.date.slice(0, 7) > month) continue  // skip transactions after this month
+        if (tx.accountId === accountId) {
+          if (tx.type === 'income') balance += tx.amount
+          else if (tx.type === 'expense' || tx.type === 'transfer') balance -= tx.amount
+        }
+        if (tx.toAccountId === accountId && tx.type === 'transfer') {
+          balance += tx.amount
+        }
+      }
+      return { month, label: formatMonthLabel(month), balance }
+    })
+  }
+
+  /**
+   * Annual summary: income + expenses for each month of a given year.
+   */
+  const getAnnualData = (year: number) => {
+    return Array.from({ length: 12 }, (_, i) => {
+      const month = `${year}-${String(i + 1).padStart(2, '0')}`
+      const { income, expenses } = getMonthlyTotals(month)
+      return {
+        month,
+        label: new Date(year, i, 1).toLocaleString('es-VE', { month: 'short' }),
+        income,
+        expenses,
+        net: income - expenses,
+      }
+    })
+  }
+
   return {
     accountBalances,
     getAccountBalance,
@@ -161,5 +211,7 @@ export function useFinance(
     getRecentTransactions,
     activeGoals,
     getBudgetsWithProgress,
+    getAccountBalanceHistory,
+    getAnnualData,
   }
 }

@@ -13,6 +13,8 @@ const NAV_ITEMS: { page: Page; label: string; icon: string }[] = [
   { page: 'budget',       label: 'Presupuesto',  icon: '◫' },
   { page: 'goals',        label: 'Metas',        icon: '◎' },
   { page: 'accounts',     label: 'Cuentas',      icon: '◈' },
+  { page: 'debts',        label: 'Deudas',       icon: '🤝' },
+  { page: 'annual',       label: 'Anual',        icon: '📅' },
   { page: 'settings',     label: 'Config',       icon: '⚙' },
 ]
 
@@ -47,8 +49,8 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
                 fontFamily: "'IBM Plex Mono', monospace",
               }}
             >
-              <span style={{ fontSize: '18px', lineHeight: 1 }}>{item.icon}</span>
-              <span style={{ fontSize: '9px', fontWeight: isActive ? 600 : 400, letterSpacing: '0.02em' }}>
+              <span style={{ fontSize: '16px', lineHeight: 1 }}>{item.icon}</span>
+              <span style={{ fontSize: '8px', fontWeight: isActive ? 600 : 400, letterSpacing: '0.02em' }}>
                 {item.label}
               </span>
             </button>
@@ -137,7 +139,7 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps) {
         color: '#6b6b9e',
         flexShrink: 0,
       }}>
-        v1.0.0 · USD/VES
+        v1.3.0 · USD/VES
       </div>
     </nav>
   )
