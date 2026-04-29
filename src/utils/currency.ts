@@ -77,8 +77,9 @@ export function currentMonth(): string {
  */
 export function monthsAgo(n: number): string {
   const d = new Date()
+  d.setDate(1) // prevent day overflow (e.g. Jan 31 - 1 month = Feb 31 → Mar 3)
   d.setMonth(d.getMonth() - n)
-  return d.toISOString().slice(0, 7)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
 /**
