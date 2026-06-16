@@ -9,7 +9,7 @@ interface ProgressBarProps {
 
 export function ProgressBar({
   value,
-  color = '#8b5cf6',
+  color = '#3ecf8e',
   height = 6,
   showLabel = false,
 }: ProgressBarProps) {
@@ -20,7 +20,7 @@ export function ProgressBar({
       {showLabel && (
         <div style={{
           fontSize: '11px',
-          color: '#6b6b9e',
+          color: '#71717a',
           textAlign: 'right',
           marginBottom: '4px',
         }}>
@@ -28,7 +28,7 @@ export function ProgressBar({
         </div>
       )}
       <div style={{
-        background: '#131328',
+        background: '#161619',
         borderRadius: '9999px',
         height,
         overflow: 'hidden',

@@ -7,9 +7,9 @@ interface TypeSelectorProps {
 }
 
 const TYPES: { value: Transaction['type']; label: string; color: string; bg: string }[] = [
-  { value: 'income',   label: 'Ingreso',      color: '#10d97a', bg: '#10d97a18' },
-  { value: 'expense',  label: 'Gasto',        color: '#f43f5e', bg: '#f43f5e18' },
-  { value: 'transfer', label: 'Transferencia', color: '#38bdf8', bg: '#38bdf818' },
+  { value: 'income',   label: 'Ingreso',    color: '#3ecf8e', bg: 'rgba(62,207,142,.16)' },
+  { value: 'expense',  label: 'Gasto',      color: '#f0716a', bg: 'rgba(240,113,106,.16)' },
+  { value: 'transfer', label: 'Transfer.',  color: '#fafafa', bg: '#26262b' },
 ]
 
 export function TypeSelector({ value, onChange }: TypeSelectorProps) {
@@ -18,29 +18,27 @@ export function TypeSelector({ value, onChange }: TypeSelectorProps) {
       display: 'grid',
       gridTemplateColumns: '1fr 1fr 1fr',
       gap: '8px',
-      marginBottom: '20px',
+      marginBottom: '4px',
     }}>
-      {TYPES.map(t => (
-        <button
-          key={t.value}
-          type="button"
-          onClick={() => onChange(t.value)}
-          style={{
-            padding: '10px 0',
-            borderRadius: '8px',
-            border: `1px solid ${value === t.value ? t.color : '#18183a'}`,
-            background: value === t.value ? t.bg : 'transparent',
-            color: value === t.value ? t.color : '#6b6b9e',
-            fontSize: '12px',
-            fontWeight: 600,
-            fontFamily: "'IBM Plex Mono', monospace",
-            transition: 'all 0.15s',
-            cursor: 'pointer',
-          }}
-        >
-          {t.label}
-        </button>
-      ))}
+      {TYPES.map(t => {
+        const on = value === t.value
+        return (
+          <button
+            key={t.value}
+            type="button"
+            onClick={() => onChange(t.value)}
+            style={{
+              height: '34px', borderRadius: '8px',
+              background: on ? t.bg : '#141417',
+              color: on ? t.color : '#71717a',
+              fontSize: '12.5px', fontWeight: 600,
+              transition: 'all 0.12s',
+            }}
+          >
+            {t.label}
+          </button>
+        )
+      })}
     </div>
   )
 }

@@ -274,6 +274,7 @@ export default function App() {
         return (
           <Transactions
             accounts={accounts} transactions={transactions} settings={settings}
+            displayCurrency={displayCurrency} onCurrencyChange={changeDisplayCurrency}
             onAdd={addTransaction} onUpdate={updateTransaction} onDelete={deleteTransaction}
           />
         )
@@ -281,13 +282,15 @@ export default function App() {
         return (
           <BudgetPage
             budgets={budgets} transactions={transactions} settings={settings}
+            displayCurrency={displayCurrency} onCurrencyChange={changeDisplayCurrency}
             onAdd={addBudget} onDelete={deleteBudget}
           />
         )
       case 'goals':
         return (
           <Goals
-            goals={goals}
+            goals={goals} settings={settings}
+            displayCurrency={displayCurrency} onCurrencyChange={changeDisplayCurrency}
             onAdd={addGoal} onUpdate={updateGoal} onDelete={deleteGoal}
           />
         )
@@ -295,6 +298,7 @@ export default function App() {
         return (
           <Accounts
             accounts={accounts} transactions={transactions} settings={settings}
+            displayCurrency={displayCurrency} onCurrencyChange={changeDisplayCurrency}
             getBalance={finance.getAccountBalance}
             getTransactionCount={finance.getTransactionCount}
             onAdd={addAccount} onUpdate={updateAccount} onDelete={deleteAccount}
@@ -304,6 +308,7 @@ export default function App() {
         return (
           <Debts
             debts={debts} settings={settings}
+            displayCurrency={displayCurrency} onCurrencyChange={changeDisplayCurrency}
             onAdd={addDebt} onUpdate={updateDebt} onDelete={deleteDebt}
           />
         )
@@ -312,12 +317,14 @@ export default function App() {
           <Annual
             accounts={accounts} transactions={transactions}
             goals={goals} budgets={budgets} settings={settings}
+            displayCurrency={displayCurrency} onCurrencyChange={changeDisplayCurrency}
           />
         )
       case 'settings':
         return (
           <SettingsPage
             settings={settings} accounts={accounts}
+            displayCurrency={displayCurrency} onCurrencyChange={changeDisplayCurrency}
             onUpdateSettings={updateSettings}
             onClearData={clearAllData}
             onSignOut={handleSignOut}

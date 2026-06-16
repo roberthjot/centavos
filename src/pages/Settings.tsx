@@ -1,68 +1,56 @@
-// Settings page — exchange rate (manual + live API), defaults, data management, app info
+// Settings page — redesigned 2026. Exchange rate (manual + live API), defaults,
+// custom categories, data management, info, sign out.
 import { useState } from 'react'
 import { useIsMobile } from '../hooks/useIsMobile'
 import type { Account, Settings as SettingsType } from '../types'
 import { exportAllData, importAllData } from '../utils/storage'
+import { Icon } from '../components/ui/Icon'
+import { Topbar } from '../components/layout/Topbar'
+import { card, pageTitle, pageSubtitle, btnPrimary, btnGhost, btnDanger } from '../components/ui/styles'
 
-// DolarAPI Venezuela response shape
 interface DolarRate {
-  fuente:              string   // "BCV", "PARALELO", "PROMEDIO", etc.
-  nombre:              string
-  promedio:            number
-  compra?:             number
-  venta?:              number
-  fechaActualizacion?: string
+  fuente: string; nombre: string; promedio: number
+  compra?: number; venta?: number; fechaActualizacion?: string
 }
 
 interface SettingsProps {
-  settings:         SettingsType
-  accounts:         Account[]
+  settings: SettingsType
+  accounts: Account[]
+  displayCurrency: 'USD' | 'VES'
+  onCurrencyChange: (cur: 'USD' | 'VES') => void
   onUpdateSettings: (s: Partial<SettingsType>) => void
-  onClearData:      () => void
-  onSignOut:        () => void
+  onClearData: () => void
+  onSignOut: () => void
 }
 
-export function Settings({ settings, accounts, onUpdateSettings, onClearData, onSignOut }: SettingsProps) {
+export function Settings({ settings, accounts, displayCurrency, onCurrencyChange, onUpdateSettings, onClearData, onSignOut }: SettingsProps) {
   const isMobile = useIsMobile()
 
-  // ── Exchange rate state ───────────────────────────────────
-  const [rateInput,     setRateInput]     = useState(String(settings.exchangeRate))
-  const [rateSaved,     setRateSaved]     = useState(false)
-  const [liveRates,     setLiveRates]     = useState<DolarRate[]>([])
+  const [rateInput, setRateInput] = useState(String(settings.exchangeRate))
+  const [rateSaved, setRateSaved] = useState(false)
+  const [liveRates, setLiveRates] = useState<DolarRate[]>([])
   const [fetchingRates, setFetchingRates] = useState(false)
-  const [fetchError,    setFetchError]    = useState('')
+  const [fetchError, setFetchError] = useState('')
 
-  // ── Custom categories state ───────────────────────────────
-  const [newExpenseCat,   setNewExpenseCat]   = useState('')
-  const [newIncomeCat,    setNewIncomeCat]    = useState('')
-  // Inline edit: tracks which item is being edited { idx, val }
-  const [editingExpense, setEditingExpense] = useState<{ idx: number; val: string } | null>(null)
-  const [editingIncome,  setEditingIncome]  = useState<{ idx: number; val: string } | null>(null)
+  const [newExpenseCat, setNewExpenseCat] = useState('')
+  const [newIncomeCat, setNewIncomeCat] = useState('')
+  const [clearConfirm, setClearConfirm] = useState(false)
+  const [importStatus, setImportStatus] = useState('')
 
-  // ── Other state ───────────────────────────────────────────
-  const [clearConfirm,  setClearConfirm]  = useState(false)
-  const [importStatus,  setImportStatus]  = useState('')
-
-  // ── Handlers ──────────────────────────────────────────────
   const saveRate = () => {
     const n = parseFloat(rateInput)
     if (isNaN(n) || n <= 0) return
     onUpdateSettings({ exchangeRate: n, exchangeRateUpdatedAt: new Date().toISOString() })
-    setRateSaved(true)
-    setLiveRates([])
+    setRateSaved(true); setLiveRates([])
     setTimeout(() => setRateSaved(false), 2000)
   }
 
-  // Fetch live rates from ve.dolarapi.com — free, no API key required
   const fetchLiveRates = async () => {
-    setFetchingRates(true)
-    setFetchError('')
-    setLiveRates([])
+    setFetchingRates(true); setFetchError(''); setLiveRates([])
     try {
-      const res  = await fetch('https://ve.dolarapi.com/v1/dolares')
+      const res = await fetch('https://ve.dolarapi.com/v1/dolares')
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json() as DolarRate[]
-      // Show only sources with a valid promedio
       setLiveRates(data.filter(r => r.promedio && r.promedio > 0))
     } catch (err) {
       setFetchError('No se pudo obtener el tipo de cambio. Intenta de nuevo.')
@@ -72,616 +60,202 @@ export function Settings({ settings, accounts, onUpdateSettings, onClearData, on
     }
   }
 
-  // Apply a rate from the API results
   const applyLiveRate = (rate: DolarRate) => {
-    const value = rate.promedio
-    setRateInput(String(value))
-    onUpdateSettings({ exchangeRate: value, exchangeRateUpdatedAt: new Date().toISOString() })
-    setLiveRates([])
-    setRateSaved(true)
+    setRateInput(String(rate.promedio))
+    onUpdateSettings({ exchangeRate: rate.promedio, exchangeRateUpdatedAt: new Date().toISOString() })
+    setLiveRates([]); setRateSaved(true)
     setTimeout(() => setRateSaved(false), 2000)
   }
 
-  // ── Custom category handlers ──────────────────────────────
-
-  const addExpenseCategory = () => {
-    const name = newExpenseCat.trim()
+  const addCat = (kind: 'exp' | 'inc') => {
+    const name = (kind === 'exp' ? newExpenseCat : newIncomeCat).trim()
     if (!name) return
-    const current = settings.customExpenseCategories ?? []
-    if (current.includes(name)) return  // no duplicates
-    onUpdateSettings({ customExpenseCategories: [...current, name] })
-    setNewExpenseCat('')
+    const key = kind === 'exp' ? 'customExpenseCategories' : 'customIncomeCategories'
+    const current = settings[key] ?? []
+    if (current.includes(name)) return
+    onUpdateSettings({ [key]: [...current, name] })
+    kind === 'exp' ? setNewExpenseCat('') : setNewIncomeCat('')
   }
-
-  const removeExpenseCategory = (name: string) => {
-    const current = settings.customExpenseCategories ?? []
-    onUpdateSettings({ customExpenseCategories: current.filter(c => c !== name) })
-  }
-
-  const addIncomeCategory = () => {
-    const name = newIncomeCat.trim()
-    if (!name) return
-    const current = settings.customIncomeCategories ?? []
-    if (current.includes(name)) return  // no duplicates
-    onUpdateSettings({ customIncomeCategories: [...current, name] })
-    setNewIncomeCat('')
-  }
-
-  const removeIncomeCategory = (name: string) => {
-    const current = settings.customIncomeCategories ?? []
-    onUpdateSettings({ customIncomeCategories: current.filter(c => c !== name) })
-  }
-
-  // Save edited expense category — renames the item at editingExpense.idx
-  const saveExpenseCategoryEdit = () => {
-    if (!editingExpense) return
-    const newName = editingExpense.val.trim()
-    const current = settings.customExpenseCategories ?? []
-    const original = current[editingExpense.idx]
-    // Cancel if empty, unchanged, or duplicate
-    if (!newName || newName === original || current.some((c, i) => c === newName && i !== editingExpense.idx)) {
-      setEditingExpense(null)
-      return
-    }
-    const updated = current.map((c, i) => (i === editingExpense.idx ? newName : c))
-    onUpdateSettings({ customExpenseCategories: updated })
-    setEditingExpense(null)
-  }
-
-  // Save edited income category — renames the item at editingIncome.idx
-  const saveIncomeCategoryEdit = () => {
-    if (!editingIncome) return
-    const newName = editingIncome.val.trim()
-    const current = settings.customIncomeCategories ?? []
-    const original = current[editingIncome.idx]
-    if (!newName || newName === original || current.some((c, i) => c === newName && i !== editingIncome.idx)) {
-      setEditingIncome(null)
-      return
-    }
-    const updated = current.map((c, i) => (i === editingIncome.idx ? newName : c))
-    onUpdateSettings({ customIncomeCategories: updated })
-    setEditingIncome(null)
+  const removeCat = (kind: 'exp' | 'inc', name: string) => {
+    const key = kind === 'exp' ? 'customExpenseCategories' : 'customIncomeCategories'
+    const current = settings[key] ?? []
+    onUpdateSettings({ [key]: current.filter(c => c !== name) })
   }
 
   const handleExport = () => {
     const data = exportAllData()
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-    const url  = URL.createObjectURL(blob)
-    const a    = document.createElement('a')
-    a.href     = url
-    a.download = `centavos-backup-${new Date().toISOString().slice(0, 10)}.json`
-    a.click()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = `centavos-backup-${new Date().toISOString().slice(0, 10)}.json`; a.click()
     URL.revokeObjectURL(url)
   }
-
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const file = e.target.files?.[0]; if (!file) return
     const reader = new FileReader()
     reader.onload = (ev) => {
-      try {
-        const data = JSON.parse(ev.target?.result as string)
-        importAllData(data)
-        setImportStatus('✅ Datos importados. Recarga la página para ver los cambios.')
-      } catch {
-        setImportStatus('❌ Error al leer el archivo. Asegúrate de que sea un JSON válido.')
-      }
+      try { importAllData(JSON.parse(ev.target?.result as string)); setImportStatus('✓ Datos importados. Recarga la página para ver los cambios.') }
+      catch { setImportStatus('✕ Error al leer el archivo. Asegúrate de que sea un JSON válido.') }
     }
-    reader.readAsText(file)
-    e.target.value = ''
+    reader.readAsText(file); e.target.value = ''
   }
+  const handleClear = () => { if (!clearConfirm) { setClearConfirm(true); return } onClearData(); setClearConfirm(false) }
 
-  const handleClear = () => {
-    if (!clearConfirm) { setClearConfirm(true); return }
-    onClearData()
-    setClearConfirm(false)
-  }
-
-  // ── UI helpers ────────────────────────────────────────────
-  const sectionTitle = (text: string) => (
-    <h2 style={{ margin: '0 0 20px 0', fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: '16px', color: '#eeeef8', paddingBottom: '12px', borderBottom: '1px solid #18183a' }}>
-      {text}
-    </h2>
-  )
-
-  const card = (children: React.ReactNode) => (
-    <div style={{ background: '#0c0c1e', border: '1px solid #18183a', borderRadius: '10px', padding: '24px', marginBottom: '20px' }}>
-      {children}
+  const sectionTitle = (text: string, sub?: string) => (
+    <div style={{ marginBottom: '16px' }}>
+      <div style={{ fontSize: '14px', fontWeight: 600 }}>{text}</div>
+      {sub && <div style={{ fontSize: '12.5px', color: '#71717a', marginTop: '4px' }}>{sub}</div>}
     </div>
   )
 
-  const labelStyle: React.CSSProperties  = { fontSize: '12px', color: '#6b6b9e', display: 'block', marginBottom: '6px' }
-  const btnPrimary: React.CSSProperties  = { padding: '9px 18px', background: '#8b5cf6', color: '#eeeef8', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, fontFamily: "'IBM Plex Mono', monospace", cursor: 'pointer' }
-  const btnSecondary: React.CSSProperties = { padding: '9px 18px', background: '#131328', color: '#6b6b9e', border: '1px solid #18183a', borderRadius: '6px', fontSize: '13px', fontFamily: "'IBM Plex Mono', monospace", cursor: 'pointer' }
-  const btnDanger: React.CSSProperties   = { padding: '9px 18px', background: clearConfirm ? '#f43f5e' : '#131328', color: clearConfirm ? '#fff' : '#f43f5e', border: `1px solid ${clearConfirm ? '#f43f5e' : '#f43f5e40'}`, borderRadius: '6px', fontSize: '13px', fontFamily: "'IBM Plex Mono', monospace", cursor: 'pointer', transition: 'all 0.15s' }
+  const sourceName: Record<string, string> = { BCV: 'BCV (oficial)', PARALELO: 'Paralelo', PROMEDIO: 'Promedio', BCVDIGITAL: 'BCV Digital' }
 
-  const pad = isMobile ? '16px' : '32px'
+  const curToggle = (val: 'USD' | 'VES', onChange: (c: 'USD' | 'VES') => void) => (
+    <div style={{ display: 'flex', background: '#141417', border: '1px solid #26262b', borderRadius: '9px', padding: '2px' }}>
+      {(['USD', 'VES'] as const).map(c => (
+        <button key={c} onClick={() => onChange(c)} style={{ padding: '6px 14px', borderRadius: '7px', fontSize: '12px', fontWeight: 600, background: val === c ? '#26262b' : 'transparent', color: val === c ? '#fafafa' : '#71717a' }}>{c}</button>
+      ))}
+    </div>
+  )
 
-  // Source label mapping for display
-  const sourceName: Record<string, string> = {
-    BCV:       'BCV (oficial)',
-    PARALELO:  'Paralelo',
-    PROMEDIO:  'Promedio',
-    BCVDIGITAL:'BCV Digital',
-  }
-
-  return (
-    <div style={{ padding: pad, maxWidth: isMobile ? '100%' : '640px' }}>
-      <h1 style={{ margin: '0 0 28px 0', fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: isMobile ? '20px' : '24px', color: '#eeeef8' }}>
-        Configuración
-      </h1>
-
-      {/* ── Exchange rate ─────────────────────────────────── */}
-      {card(
-        <>
-          {sectionTitle('Tipo de cambio')}
-
-          {/* Manual input row */}
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', marginBottom: '10px' }}>
-            <div style={{ flex: 1 }}>
-              <label style={labelStyle}>1 USD =</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <input type="number" value={rateInput} onChange={e => setRateInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') saveRate() }} min="0.01" step="0.01" style={{ flex: 1 }} />
-                <span style={{ color: '#6b6b9e', fontSize: '14px', flexShrink: 0 }}>VES</span>
-              </div>
-            </div>
-            <button onClick={saveRate} style={{ ...btnPrimary, background: rateSaved ? '#10d97a' : '#8b5cf6' }}>
-              {rateSaved ? '✓ Guardado' : 'Guardar'}
+  const catColumn = (kind: 'exp' | 'inc', title: string, color: string, list: string[], value: string, setValue: (v: string) => void) => (
+    <div>
+      <div style={{ fontSize: '13px', fontWeight: 600, color, marginBottom: '12px' }}>{title}</div>
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+        <input value={value} onChange={e => setValue(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') addCat(kind) }} placeholder="Nueva categoría…" maxLength={30} style={{ flex: 1 }} />
+        <button onClick={() => addCat(kind)} style={{ width: '40px', borderRadius: '8px', background: '#141417', border: '1px solid #26262b', color, fontSize: '16px' }}>+</button>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        {list.length === 0 ? (
+          <div style={{ fontSize: '12px', color: '#52525b' }}>Sin categorías personalizadas</div>
+        ) : list.map(cat => (
+          <div key={cat} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#141417', border: '1px solid #26262b', borderRadius: '8px' }}>
+            <span style={{ fontSize: '13px', color: '#d4d4d8' }}>{cat}</span>
+            <button onClick={() => removeCat(kind, cat)} title="Eliminar" style={{ color: '#52525b', display: 'flex' }} onMouseEnter={e => (e.currentTarget.style.color = '#f0716a')} onMouseLeave={e => (e.currentTarget.style.color = '#52525b')}>
+              <Icon name="trash" size={14} />
             </button>
           </div>
+        ))}
+      </div>
+    </div>
+  )
 
+  return (
+    <div style={{ padding: isMobile ? '20px 16px 40px' : '24px 40px 56px', maxWidth: '760px', animation: 'cnt-fade .2s ease' }}>
+      <Topbar pageLabel="Configuración" displayCurrency={displayCurrency} onCurrencyChange={onCurrencyChange} />
+
+      <div style={{ marginBottom: '28px' }}>
+        <h1 style={pageTitle}>Configuración</h1>
+        <p style={pageSubtitle}>Ajustes y gestión de datos</p>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        {/* Exchange rate */}
+        <div style={card}>
+          {sectionTitle('Tipo de cambio', 'Bolívares por dólar — 1 USD = N VES')}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <span className="font-mono" style={{ fontSize: '14px', color: '#71717a' }}>Bs</span>
+            <input type="number" value={rateInput} onChange={e => setRateInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') saveRate() }} min="0.01" step="0.01" className="font-mono" style={{ width: '150px' }} />
+            <span style={{ fontSize: '13px', color: '#52525b' }}>/ USD</span>
+            <button onClick={saveRate} style={{ ...btnPrimary, background: rateSaved ? '#3ecf8e' : '#3ecf8e' }}>{rateSaved ? '✓ Guardado' : 'Guardar'}</button>
+            <button onClick={fetchLiveRates} disabled={fetchingRates} style={{ ...btnGhost, opacity: fetchingRates ? 0.6 : 1 }}>
+              <Icon name="refresh" size={14} />{fetchingRates ? 'Consultando…' : 'Tasa en vivo'}
+            </button>
+          </div>
           {settings.exchangeRateUpdatedAt && (
-            <div style={{ fontSize: '11px', color: '#6b6b9e', marginBottom: '12px' }}>
-              Actualizado: {new Date(settings.exchangeRateUpdatedAt).toLocaleString('es-VE')}
-            </div>
+            <div style={{ fontSize: '11px', color: '#52525b', marginTop: '10px' }}>Actualizado: {new Date(settings.exchangeRateUpdatedAt).toLocaleString('es-VE')}</div>
           )}
-
-          {/* Live rates button */}
-          <button
-            onClick={fetchLiveRates}
-            disabled={fetchingRates}
-            style={{ ...btnSecondary, display: 'flex', alignItems: 'center', gap: '6px', opacity: fetchingRates ? 0.6 : 1 }}
-          >
-            {fetchingRates ? '⏳ Consultando...' : '🌐 Obtener tasa en tiempo real'}
-          </button>
-
-          {fetchError && (
-            <div style={{ marginTop: '10px', fontSize: '12px', color: '#f43f5e', padding: '8px 12px', background: '#f43f5e12', border: '1px solid #f43f5e30', borderRadius: '6px' }}>
-              {fetchError}
-            </div>
-          )}
-
-          {/* Live rates results */}
+          {fetchError && <div style={{ marginTop: '10px', fontSize: '12px', color: '#f0716a' }}>{fetchError}</div>}
           {liveRates.length > 0 && (
-            <div style={{ marginTop: '14px' }}>
-              <div style={{ fontSize: '12px', color: '#6b6b9e', marginBottom: '8px' }}>
-                Selecciona la tasa que quieres usar:
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {liveRates.map(rate => (
-                  <button
-                    key={rate.fuente}
-                    onClick={() => applyLiveRate(rate)}
-                    style={{
-                      display:        'flex',
-                      justifyContent: 'space-between',
-                      alignItems:     'center',
-                      padding:        '12px 14px',
-                      background:     '#131328',
-                      border:         '1px solid #18183a',
-                      borderRadius:   '8px',
-                      cursor:         'pointer',
-                      textAlign:      'left',
-                      transition:     'border-color 0.15s',
-                    }}
-                    onMouseEnter={e => (e.currentTarget.style.borderColor = '#8b5cf6')}
-                    onMouseLeave={e => (e.currentTarget.style.borderColor = '#18183a')}
-                  >
-                    <div>
-                      <div style={{ fontSize: '13px', fontWeight: 600, color: '#eeeef8' }}>
-                        {sourceName[rate.fuente] ?? rate.nombre}
-                      </div>
-                      {rate.fechaActualizacion && (
-                        <div style={{ fontSize: '11px', color: '#6b6b9e', marginTop: '2px' }}>
-                          {new Date(rate.fechaActualizacion).toLocaleString('es-VE')}
-                        </div>
-                      )}
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: '16px', fontWeight: 700, color: '#8b5cf6', fontFamily: "'IBM Plex Mono', monospace" }}>
-                        {rate.promedio.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Bs
-                      </div>
-                      <div style={{ fontSize: '11px', color: '#6b6b9e' }}>por dólar · click para usar</div>
-                    </div>
-                  </button>
-                ))}
-              </div>
+            <div style={{ marginTop: '14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ fontSize: '12px', color: '#71717a' }}>Selecciona la tasa que quieres usar:</div>
+              {liveRates.map(rate => (
+                <button key={rate.fuente} onClick={() => applyLiveRate(rate)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', background: '#141417', border: '1px solid #26262b', borderRadius: '8px', textAlign: 'left' }}
+                  onMouseEnter={e => (e.currentTarget.style.borderColor = '#3ecf8e')} onMouseLeave={e => (e.currentTarget.style.borderColor = '#26262b')}>
+                  <div>
+                    <div style={{ fontSize: '13px', fontWeight: 600 }}>{sourceName[rate.fuente] ?? rate.nombre}</div>
+                    {rate.fechaActualizacion && <div style={{ fontSize: '11px', color: '#52525b', marginTop: '2px' }}>{new Date(rate.fechaActualizacion).toLocaleString('es-VE')}</div>}
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div className="font-mono" style={{ fontSize: '15px', fontWeight: 600, color: '#3ecf8e' }}>{rate.promedio.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Bs</div>
+                    <div style={{ fontSize: '11px', color: '#52525b' }}>por dólar · click para usar</div>
+                  </div>
+                </button>
+              ))}
             </div>
           )}
+          <div style={{ fontSize: '12px', color: '#52525b', marginTop: '12px' }}>Tasa obtenida de <strong style={{ color: '#a1a1aa' }}>ve.dolarapi.com</strong> — incluye BCV oficial y paralela.</div>
+        </div>
 
-          <div style={{ fontSize: '12px', color: '#6b6b9e', marginTop: '12px' }}>
-            Tasa obtenida de <strong style={{ color: '#a0a0c8' }}>ve.dolarapi.com</strong> — incluye tasa BCV oficial y tasa paralela.
-          </div>
-        </>,
-      )}
-
-      {/* ── Defaults ──────────────────────────────────────── */}
-      {card(
-        <>
-          {sectionTitle('Preferencias por defecto')}
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '16px' }}>
+        {/* Defaults */}
+        <div style={card}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
             <div>
-              <label style={labelStyle}>Moneda predeterminada</label>
-              <select value={settings.defaultCurrency} onChange={e => onUpdateSettings({ defaultCurrency: e.target.value as 'USD' | 'VES' })}>
-                <option value="USD">USD — Dólar americano</option>
-                <option value="VES">VES — Bolívar venezolano</option>
-              </select>
+              <div style={{ fontSize: '14px', fontWeight: 600 }}>Moneda por defecto</div>
+              <div style={{ fontSize: '12.5px', color: '#71717a', marginTop: '4px' }}>Cómo se muestran los montos al iniciar</div>
             </div>
-            <div>
-              <label style={labelStyle}>Cuenta predeterminada</label>
-              <select value={settings.defaultAccountId} onChange={e => onUpdateSettings({ defaultAccountId: e.target.value })}>
-                <option value="">Sin predeterminada</option>
-                {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-              </select>
-            </div>
+            {curToggle(settings.defaultCurrency, c => onUpdateSettings({ defaultCurrency: c }))}
           </div>
-        </>,
-      )}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', marginTop: '18px', paddingTop: '18px', borderTop: '1px solid #19191d' }}>
+            <div>
+              <div style={{ fontSize: '14px', fontWeight: 600 }}>Cuenta por defecto</div>
+              <div style={{ fontSize: '12.5px', color: '#71717a', marginTop: '4px' }}>Preseleccionada al crear movimientos</div>
+            </div>
+            <select value={settings.defaultAccountId} onChange={e => onUpdateSettings({ defaultAccountId: e.target.value })} style={{ width: 'auto', minWidth: '180px' }}>
+              <option value="">Sin predeterminada</option>
+              {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+            </select>
+          </div>
+        </div>
 
-      {/* ── Custom categories ─────────────────────────────── */}
-      {card(
-        <>
-          {sectionTitle('Categorías personalizadas')}
-          <p style={{ margin: '0 0 20px 0', fontSize: '13px', color: '#6b6b9e', lineHeight: 1.6 }}>
-            Agrega tus propias categorías para gastos e ingresos. Aparecerán junto a las predeterminadas al registrar movimientos.
-          </p>
-
+        {/* Custom categories */}
+        <div style={card}>
+          {sectionTitle('Categorías personalizadas', 'Aparecerán junto a las predeterminadas al registrar movimientos.')}
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '24px' }}>
-            {/* ── Expense custom categories ── */}
-            <div>
-              <div style={{ fontSize: '13px', fontWeight: 600, color: '#f43f5e', marginBottom: '12px' }}>
-                🔴 Gastos
-              </div>
-
-              {/* Add new */}
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-                <input
-                  type="text"
-                  value={newExpenseCat}
-                  onChange={e => setNewExpenseCat(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') addExpenseCategory() }}
-                  placeholder="Nueva categoría..."
-                  style={{ flex: 1, fontSize: '13px' }}
-                  maxLength={30}
-                />
-                <button
-                  onClick={addExpenseCategory}
-                  style={{ ...btnPrimary, padding: '8px 14px', background: '#f43f5e', fontSize: '18px', lineHeight: 1 }}
-                  title="Agregar categoría de gasto"
-                >
-                  +
-                </button>
-              </div>
-
-              {/* List */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                {(settings.customExpenseCategories ?? []).length === 0 ? (
-                  <div style={{ fontSize: '12px', color: '#6b6b9e', fontStyle: 'italic' }}>
-                    Sin categorías personalizadas
-                  </div>
-                ) : (
-                  (settings.customExpenseCategories ?? []).map((cat, idx) =>
-                    editingExpense?.idx === idx ? (
-                      /* ── Inline edit row ── */
-                      <div
-                        key={cat}
-                        style={{ display: 'flex', gap: '6px', alignItems: 'center' }}
-                      >
-                        <input
-                          autoFocus
-                          type="text"
-                          value={editingExpense.val}
-                          onChange={e => setEditingExpense({ idx, val: e.target.value })}
-                          onKeyDown={e => {
-                            if (e.key === 'Enter')  saveExpenseCategoryEdit()
-                            if (e.key === 'Escape') setEditingExpense(null)
-                          }}
-                          maxLength={30}
-                          style={{ flex: 1, fontSize: '13px' }}
-                        />
-                        {/* Confirm */}
-                        <button
-                          onClick={saveExpenseCategoryEdit}
-                          title="Confirmar"
-                          style={{
-                            background: '#f43f5e', border: 'none', borderRadius: '6px',
-                            color: '#fff', cursor: 'pointer', fontSize: '14px',
-                            padding: '6px 10px', lineHeight: 1,
-                          }}
-                        >
-                          ✓
-                        </button>
-                        {/* Cancel */}
-                        <button
-                          onClick={() => setEditingExpense(null)}
-                          title="Cancelar"
-                          style={{
-                            background: '#131328', border: '1px solid #18183a', borderRadius: '6px',
-                            color: '#6b6b9e', cursor: 'pointer', fontSize: '14px',
-                            padding: '6px 10px', lineHeight: 1,
-                          }}
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ) : (
-                      /* ── Normal row ── */
-                      <div
-                        key={cat}
-                        style={{
-                          display:        'flex',
-                          justifyContent: 'space-between',
-                          alignItems:     'center',
-                          padding:        '8px 12px',
-                          background:     '#131328',
-                          border:         '1px solid #18183a',
-                          borderRadius:   '6px',
-                        }}
-                      >
-                        <span style={{ fontSize: '13px', color: '#eeeef8' }}>🔖 {cat}</span>
-                        <div style={{ display: 'flex', gap: '4px' }}>
-                          {/* Edit */}
-                          <button
-                            onClick={() => setEditingExpense({ idx, val: cat })}
-                            title={`Editar "${cat}"`}
-                            style={{
-                              background: 'none', border: 'none', cursor: 'pointer',
-                              color: '#6b6b9e', fontSize: '14px', padding: '0 5px',
-                              lineHeight: 1,
-                            }}
-                            onMouseEnter={e => (e.currentTarget.style.color = '#8b5cf6')}
-                            onMouseLeave={e => (e.currentTarget.style.color = '#6b6b9e')}
-                          >
-                            ✏
-                          </button>
-                          {/* Delete */}
-                          <button
-                            onClick={() => removeExpenseCategory(cat)}
-                            title={`Eliminar "${cat}"`}
-                            style={{
-                              background: 'none', border: 'none', cursor: 'pointer',
-                              color: '#6b6b9e', fontSize: '16px', padding: '0 4px',
-                              lineHeight: 1,
-                            }}
-                            onMouseEnter={e => (e.currentTarget.style.color = '#f43f5e')}
-                            onMouseLeave={e => (e.currentTarget.style.color = '#6b6b9e')}
-                          >
-                            ×
-                          </button>
-                        </div>
-                      </div>
-                    )
-                  )
-                )}
-              </div>
-            </div>
-
-            {/* ── Income custom categories ── */}
-            <div>
-              <div style={{ fontSize: '13px', fontWeight: 600, color: '#10d97a', marginBottom: '12px' }}>
-                🟢 Ingresos
-              </div>
-
-              {/* Add new */}
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-                <input
-                  type="text"
-                  value={newIncomeCat}
-                  onChange={e => setNewIncomeCat(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') addIncomeCategory() }}
-                  placeholder="Nueva categoría..."
-                  style={{ flex: 1, fontSize: '13px' }}
-                  maxLength={30}
-                />
-                <button
-                  onClick={addIncomeCategory}
-                  style={{ ...btnPrimary, padding: '8px 14px', background: '#10d97a', fontSize: '18px', lineHeight: 1 }}
-                  title="Agregar categoría de ingreso"
-                >
-                  +
-                </button>
-              </div>
-
-              {/* List */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                {(settings.customIncomeCategories ?? []).length === 0 ? (
-                  <div style={{ fontSize: '12px', color: '#6b6b9e', fontStyle: 'italic' }}>
-                    Sin categorías personalizadas
-                  </div>
-                ) : (
-                  (settings.customIncomeCategories ?? []).map((cat, idx) =>
-                    editingIncome?.idx === idx ? (
-                      /* ── Inline edit row ── */
-                      <div
-                        key={cat}
-                        style={{ display: 'flex', gap: '6px', alignItems: 'center' }}
-                      >
-                        <input
-                          autoFocus
-                          type="text"
-                          value={editingIncome.val}
-                          onChange={e => setEditingIncome({ idx, val: e.target.value })}
-                          onKeyDown={e => {
-                            if (e.key === 'Enter')  saveIncomeCategoryEdit()
-                            if (e.key === 'Escape') setEditingIncome(null)
-                          }}
-                          maxLength={30}
-                          style={{ flex: 1, fontSize: '13px' }}
-                        />
-                        {/* Confirm */}
-                        <button
-                          onClick={saveIncomeCategoryEdit}
-                          title="Confirmar"
-                          style={{
-                            background: '#10d97a', border: 'none', borderRadius: '6px',
-                            color: '#06060f', cursor: 'pointer', fontSize: '14px',
-                            padding: '6px 10px', lineHeight: 1, fontWeight: 700,
-                          }}
-                        >
-                          ✓
-                        </button>
-                        {/* Cancel */}
-                        <button
-                          onClick={() => setEditingIncome(null)}
-                          title="Cancelar"
-                          style={{
-                            background: '#131328', border: '1px solid #18183a', borderRadius: '6px',
-                            color: '#6b6b9e', cursor: 'pointer', fontSize: '14px',
-                            padding: '6px 10px', lineHeight: 1,
-                          }}
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ) : (
-                      /* ── Normal row ── */
-                      <div
-                        key={cat}
-                        style={{
-                          display:        'flex',
-                          justifyContent: 'space-between',
-                          alignItems:     'center',
-                          padding:        '8px 12px',
-                          background:     '#131328',
-                          border:         '1px solid #18183a',
-                          borderRadius:   '6px',
-                        }}
-                      >
-                        <span style={{ fontSize: '13px', color: '#eeeef8' }}>🔖 {cat}</span>
-                        <div style={{ display: 'flex', gap: '4px' }}>
-                          {/* Edit */}
-                          <button
-                            onClick={() => setEditingIncome({ idx, val: cat })}
-                            title={`Editar "${cat}"`}
-                            style={{
-                              background: 'none', border: 'none', cursor: 'pointer',
-                              color: '#6b6b9e', fontSize: '14px', padding: '0 5px',
-                              lineHeight: 1,
-                            }}
-                            onMouseEnter={e => (e.currentTarget.style.color = '#8b5cf6')}
-                            onMouseLeave={e => (e.currentTarget.style.color = '#6b6b9e')}
-                          >
-                            ✏
-                          </button>
-                          {/* Delete */}
-                          <button
-                            onClick={() => removeIncomeCategory(cat)}
-                            title={`Eliminar "${cat}"`}
-                            style={{
-                              background: 'none', border: 'none', cursor: 'pointer',
-                              color: '#6b6b9e', fontSize: '16px', padding: '0 4px',
-                              lineHeight: 1,
-                            }}
-                            onMouseEnter={e => (e.currentTarget.style.color = '#f43f5e')}
-                            onMouseLeave={e => (e.currentTarget.style.color = '#6b6b9e')}
-                          >
-                            ×
-                          </button>
-                        </div>
-                      </div>
-                    )
-                  )
-                )}
-              </div>
-            </div>
+            {catColumn('inc', 'Ingresos', '#3ecf8e', settings.customIncomeCategories ?? [], newIncomeCat, setNewIncomeCat)}
+            {catColumn('exp', 'Gastos', '#f0716a', settings.customExpenseCategories ?? [], newExpenseCat, setNewExpenseCat)}
           </div>
-        </>,
-      )}
+        </div>
 
-      {/* ── Data management ───────────────────────────────── */}
-      {card(
-        <>
-          {sectionTitle('Gestión de datos')}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <div style={{ fontSize: '13px', color: '#eeeef8', marginBottom: '2px' }}>Exportar datos</div>
-                <div style={{ fontSize: '12px', color: '#6b6b9e' }}>Descarga un backup completo como JSON</div>
-              </div>
-              <button onClick={handleExport} style={btnSecondary}>Exportar JSON</button>
-            </div>
-
-            <div style={{ borderTop: '1px solid #18183a', paddingTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <div style={{ fontSize: '13px', color: '#eeeef8', marginBottom: '2px' }}>Importar datos</div>
-                <div style={{ fontSize: '12px', color: '#6b6b9e' }}>Restaura desde un archivo JSON exportado</div>
-              </div>
-              <label style={{ ...btnSecondary, display: 'inline-block', textAlign: 'center' }}>
-                Importar JSON
-                <input type="file" accept=".json" onChange={handleImport} style={{ display: 'none' }} />
-              </label>
-            </div>
-
-            {importStatus && (
-              <div style={{ fontSize: '12px', color: importStatus.startsWith('✅') ? '#10d97a' : '#f43f5e', padding: '8px 12px', background: '#131328', borderRadius: '6px' }}>
-                {importStatus}
-              </div>
-            )}
-
-            <div style={{ borderTop: '1px solid #18183a', paddingTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <div style={{ fontSize: '13px', color: '#f43f5e', marginBottom: '2px' }}>Borrar todos los datos</div>
-                <div style={{ fontSize: '12px', color: '#6b6b9e' }}>
-                  {clearConfirm ? '⚠ Esta acción no se puede deshacer. ¿Confirmar?' : 'Elimina cuentas, transacciones, metas y presupuestos'}
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                {clearConfirm && <button onClick={() => setClearConfirm(false)} style={btnSecondary}>No</button>}
-                <button onClick={handleClear} style={btnDanger}>{clearConfirm ? 'Sí, borrar' : 'Borrar datos'}</button>
-              </div>
-            </div>
+        {/* Data management */}
+        <div style={card}>
+          {sectionTitle('Gestión de datos', 'Tus datos se sincronizan en la nube (Supabase).')}
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+            <button onClick={handleExport} style={btnGhost}><Icon name="download" size={14} /> Exportar JSON</button>
+            <label style={{ ...btnGhost, cursor: 'pointer' }}>
+              <Icon name="upload" size={14} /> Importar
+              <input type="file" accept=".json" onChange={handleImport} style={{ display: 'none', width: 'auto' }} />
+            </label>
+            <button onClick={handleClear} style={btnDanger}><Icon name="trash" size={14} /> {clearConfirm ? '¿Confirmar borrar todo?' : 'Borrar todo'}</button>
+            {clearConfirm && <button onClick={() => setClearConfirm(false)} style={btnGhost}>Cancelar</button>}
           </div>
-        </>,
-      )}
+          {importStatus && <div style={{ fontSize: '12px', color: importStatus.startsWith('✓') ? '#3ecf8e' : '#f0716a', marginTop: '12px' }}>{importStatus}</div>}
+        </div>
 
-      {/* ── App info ──────────────────────────────────────── */}
-      {card(
-        <>
+        {/* Info */}
+        <div style={card}>
           {sectionTitle('Información')}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px' }}>
-            {[
-              ['Versión',        '1.2.0'],
-              ['Tecnología',     'React 19 + Vite + TypeScript'],
-              ['Base de datos',  'Supabase (PostgreSQL)'],
-              ['Monedas',        'USD · VES'],
-              ['Tasa en vivo',   've.dolarapi.com'],
-            ].map(([label, value]) => (
+            {[['Versión', '1.3.0'], ['Tecnología', 'React 19 + Vite + TypeScript'], ['Base de datos', 'Supabase (PostgreSQL)'], ['Monedas', 'USD · VES'], ['Tasa en vivo', 've.dolarapi.com']].map(([label, value]) => (
               <div key={label} style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#6b6b9e' }}>{label}</span>
-                <span style={{ color: '#eeeef8' }}>{value}</span>
+                <span style={{ color: '#71717a' }}>{label}</span>
+                <span className="font-mono" style={{ color: '#d4d4d8' }}>{value}</span>
               </div>
             ))}
           </div>
-          <div style={{ marginTop: '16px', fontSize: '12px', color: '#6b6b9e', lineHeight: 1.6 }}>
-            CENTAVOS — App de finanzas personales para emprendedores venezolanos.
-            Datos sincronizados en la nube. Accede desde cualquier dispositivo.
-          </div>
-        </>,
-      )}
+        </div>
 
-      {/* ── Sign out ──────────────────────────────────────── */}
-      {card(
-        <>
-          {sectionTitle('Sesión')}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        {/* Sign out */}
+        <div style={card}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
             <div>
-              <div style={{ fontSize: '13px', color: '#eeeef8', marginBottom: '2px' }}>Cerrar sesión</div>
-              <div style={{ fontSize: '12px', color: '#6b6b9e' }}>Salir de tu cuenta en este dispositivo</div>
+              <div style={{ fontSize: '14px', fontWeight: 600 }}>Cerrar sesión</div>
+              <div style={{ fontSize: '12.5px', color: '#71717a', marginTop: '4px' }}>Salir de tu cuenta en este dispositivo</div>
             </div>
-            <button onClick={onSignOut} style={btnSecondary}>Cerrar sesión</button>
+            <button onClick={onSignOut} style={btnGhost}><Icon name="logout" size={14} /> Cerrar sesión</button>
           </div>
-        </>,
-      )}
+        </div>
+      </div>
     </div>
   )
 }

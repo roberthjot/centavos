@@ -7,7 +7,7 @@ export type IconName =
   | 'dashboard' | 'movimientos' | 'presupuesto' | 'metas' | 'cuentas'
   | 'deudas' | 'anual' | 'configuracion'
   | 'plus' | 'chevronLeft' | 'chevronRight' | 'logout'
-  | 'arrowUp' | 'download' | 'upload' | 'trash'
+  | 'arrowUp' | 'download' | 'upload' | 'trash' | 'pencil' | 'refresh'
 
 interface IconProps {
   name: IconName
@@ -40,6 +40,8 @@ const PATHS: Record<IconName, ReactElement> = {
   download: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="M7 10l5 5 5-5" /><path d="M12 15V3" /></>,
   upload: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="M7 9l5-5 5 5" /><path d="M12 4v12" /></>,
   trash: <><path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></>,
+  pencil: <><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" /></>,
+  refresh: <><path d="M3 12a9 9 0 0 1 15-6.7L21 8" /><path d="M21 3v5h-5" /><path d="M21 12a9 9 0 0 1-15 6.7L3 16" /><path d="M3 21v-5h5" /></>,
 }
 
 export function Icon({ name, size = 16, strokeWidth = 1.8, style }: IconProps) {

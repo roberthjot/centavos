@@ -119,3 +119,17 @@ export function formatMonthLabel(yyyyMM: string): string {
   const date = new Date(Number(year), Number(month) - 1, 1)
   return date.toLocaleDateString('es-VE', { month: 'short', year: '2-digit' })
 }
+
+/** Long month name, capitalized — e.g. "2026-06" → "Junio". */
+export function monthLongLabel(yyyyMM: string): string {
+  const [y, m] = yyyyMM.split('-').map(Number)
+  const name = new Date(y, m - 1, 1).toLocaleString('es-VE', { month: 'long' })
+  return name.charAt(0).toUpperCase() + name.slice(1)
+}
+
+/** Shift a YYYY-MM string by a number of months. */
+export function shiftMonth(yyyyMM: string, delta: number): string {
+  const [y, m] = yyyyMM.split('-').map(Number)
+  const d = new Date(y, m - 1 + delta, 1)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
