@@ -7,6 +7,7 @@ import { useIsMobile } from '../hooks/useIsMobile'
 import { Modal } from '../components/ui/Modal'
 import { CurrencyInput } from '../components/ui/CurrencyInput'
 import { EmptyState } from '../components/ui/EmptyState'
+import { Icon } from '../components/ui/Icon'
 
 interface DebtsProps {
   debts: Debt[]
@@ -251,22 +252,22 @@ export function Debts({ debts, settings, displayCurrency, onCurrencyChange, onAd
           <div style={{ marginTop: '10px', display: 'flex', gap: '8px', alignItems: 'center' }}>
             <span style={{ fontSize: '12px', color: '#f0716a' }}>¿Eliminar?</span>
             <button onClick={() => { onDelete(debt.id); setDeleteConfirm(null) }}
-              style={{ padding: '4px 10px', background: '#f0716a', color: '#fff', border: 'none', borderRadius: '4px', fontSize: '11px', cursor: 'pointer' }}>
-              Sí
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 12px', background: '#f0716a', color: '#09090b', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+              Sí, eliminar
             </button>
             <button onClick={() => setDeleteConfirm(null)}
-              style={{ padding: '4px 10px', background: '#141417', color: '#71717a', border: '1px solid #1c1c1f', borderRadius: '4px', fontSize: '11px', cursor: 'pointer' }}>
-              No
+              style={{ padding: '6px 12px', background: '#141417', color: '#71717a', border: '1px solid #1c1c1f', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>
+              Cancelar
             </button>
           </div>
         ) : (
           <button
             onClick={() => setDeleteConfirm(debt.id)}
-            style={{ marginTop: '8px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', color: '#71717a', padding: '0' }}
-            onMouseEnter={e => (e.currentTarget.style.color = '#f0716a')}
-            onMouseLeave={e => (e.currentTarget.style.color = '#71717a')}
+            style={{ marginTop: '10px', display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 12px', background: 'none', border: '1px solid #3a2226', color: '#f0716a', borderRadius: '6px', fontSize: '12px', fontWeight: 500, cursor: 'pointer', transition: 'background .12s' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(240,113,106,.08)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'none')}
           >
-            Eliminar
+            <Icon name="trash" size={13} /> Eliminar
           </button>
         )}
       </div>
