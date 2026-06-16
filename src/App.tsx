@@ -22,17 +22,20 @@ import { Settings as SettingsPage } from './pages/Settings'
 function LoadingScreen() {
   return (
     <div style={{
-      minHeight: '100dvh', background: '#080818',
+      minHeight: '100dvh', background: '#09090b',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       flexDirection: 'column', gap: '16px',
     }}>
-      <div style={{
-        fontFamily: "'Syne', sans-serif", fontWeight: 800,
-        fontSize: '28px', color: '#8b5cf6',
-      }}>
-        🪙 CENTAVOS
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{
+          width: '28px', height: '28px', borderRadius: '8px', background: '#fafafa',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <span style={{ fontWeight: 700, fontSize: '16px', color: '#09090b', lineHeight: 1 }}>¢</span>
+        </div>
+        <span style={{ fontWeight: 600, fontSize: '18px', letterSpacing: '-.02em', color: '#fafafa' }}>centavos</span>
       </div>
-      <div style={{ fontSize: '13px', color: '#6b6b9e' }}>Cargando...</div>
+      <div style={{ fontSize: '13px', color: '#71717a' }}>Cargando...</div>
     </div>
   )
 }
@@ -44,6 +47,16 @@ export default function App() {
 
   // ── App state ─────────────────────────────────────────────
   const [activePage, setActivePage]     = useState<Page>('dashboard')
+  // Global display currency (USD/VES) — drives the redesigned views' toggle.
+  // Persisted locally so it survives reloads, independent of the DB settings row.
+  const [displayCurrency, setDisplayCurrency] = useState<'USD' | 'VES'>(() => {
+    const saved = localStorage.getItem('cnt:cur')
+    return saved === 'VES' ? 'VES' : 'USD'
+  })
+  const changeDisplayCurrency = useCallback((cur: 'USD' | 'VES') => {
+    setDisplayCurrency(cur)
+    localStorage.setItem('cnt:cur', cur)
+  }, [])
   const [accounts, setAccounts]         = useState<Account[]>([])
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [goals, setGoals]               = useState<Goal[]>([])
@@ -252,6 +265,8 @@ export default function App() {
           <Dashboard
             accounts={accounts} transactions={transactions}
             goals={goals} budgets={budgets} settings={settings}
+            displayCurrency={displayCurrency} onCurrencyChange={changeDisplayCurrency}
+            onAddTransaction={addTransaction}
             onNavigate={setActivePage}
           />
         )
@@ -319,7 +334,12 @@ export default function App() {
 
   return (
     <div className="app-layout">
-      <Sidebar activePage={activePage} onNavigate={setActivePage} />
+      <Sidebar
+        activePage={activePage} onNavigate={setActivePage}
+        exchangeRate={settings.exchangeRate}
+        userEmail={user.email ?? null}
+        onSignOut={handleSignOut}
+      />
       <main className="main-content">
         {renderPage()}
       </main>

@@ -1,24 +1,41 @@
 /* Tailwind CSS v4 — base import */
 @import "tailwindcss";
 
-/* ===== CENTAVOS Design System — CSS Custom Properties ===== */
+/* ===== CENTAVOS Design System — 2026 redesign tokens =====
+ * Minimal, dark, premium (Linear/Vercel for finance). Single green accent +
+ * a reserved "sand" tone for bolívares (VES). Exposed as CSS custom properties.
+ */
 @theme {
-  /* Color palette */
-  --color-bg: #06060f;
-  --color-surface: #0c0c1e;
-  --color-surface-elevated: #131328;
-  --color-border: #18183a;
-  --color-purple: #8b5cf6;
-  --color-green: #10d97a;
-  --color-red: #f43f5e;
-  --color-yellow: #f59e0b;
-  --color-blue: #38bdf8;
-  --color-text: #eeeef8;
-  --color-muted: #6b6b9e;
+  /* Surfaces */
+  --color-bg: #09090b;            /* global background */
+  --color-surface: #0e0e10;       /* cards, modal */
+  --color-surface-alt: #0f0f12;   /* inputs, toggles, chips */
+  --color-surface-hover: #141417; /* item hover, active nav item */
+
+  /* Borders */
+  --color-hairline: #19191d;      /* dividers, chart grid */
+  --color-border: #1c1c1f;        /* card borders */
+  --color-border-strong: #26262b; /* inputs, modal, active toggle */
+
+  /* Text */
+  --color-text: #fafafa;          /* titles, values */
+  --color-text-2: #d4d4d8;        /* row labels */
+  --color-text-3: #a1a1aa;        /* metadata */
+  --color-muted: #71717a;         /* descriptions, placeholders */
+  --color-muted-strong: #52525b;  /* sub-labels, captions */
+
+  /* Accents */
+  --color-green: #3ecf8e;         /* primary action, USD, positive, progress */
+  --color-green-ink: #09271b;     /* text on green buttons */
+  --color-green-hover: #36b87e;
+  --color-sand: #cbb389;          /* VES chip */
+  --color-sand-strong: #d9a441;   /* VES stripe / warn */
+  --color-red: #f0716a;           /* expense, alerts, delete */
+  --color-amber: #d9a441;         /* budget 75–94% */
 
   /* Typography */
-  --font-mono: 'IBM Plex Mono', 'Courier New', monospace;
-  --font-display: 'Syne', sans-serif;
+  --font-sans: 'Hanken Grotesk', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Courier New', monospace;
 }
 
 /* ===== Global Reset & Base ===== */
@@ -33,10 +50,10 @@ html, body, #root {
 }
 
 body {
-  background-color: #06060f;
-  color: #eeeef8;
-  font-family: 'IBM Plex Mono', 'Courier New', monospace;
-  font-size: 14px;
+  background-color: #09090b;
+  color: #fafafa;
+  font-family: 'Hanken Grotesk', system-ui, sans-serif;
+  font-size: 13.5px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -44,43 +61,43 @@ body {
 
 /* ===== Custom Scrollbar ===== */
 ::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
+  width: 8px;
+  height: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: #06060f;
+  background: #09090b;
 }
 ::-webkit-scrollbar-thumb {
-  background: #18183a;
+  background: #26262b;
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #8b5cf6;
+  background: #3f3f46;
 }
 
 /* ===== Input & Select Base ===== */
 input, select, textarea {
-  font-family: 'IBM Plex Mono', 'Courier New', monospace;
-  font-size: 14px;
+  font-family: 'Hanken Grotesk', system-ui, sans-serif;
+  font-size: 13px;
   outline: none;
-  background: #131328;
-  color: #eeeef8;
-  border: 1px solid #18183a;
-  border-radius: 6px;
-  padding: 8px 12px;
+  background: #141417;
+  color: #fafafa;
+  border: 1px solid #26262b;
+  border-radius: 8px;
+  padding: 9px 11px;
   width: 100%;
   transition: border-color 0.15s;
 }
 
 input:focus, select:focus, textarea:focus {
-  border-color: #8b5cf6;
+  border-color: #3ecf8e;
 }
 
 input::placeholder, textarea::placeholder {
-  color: #6b6b9e;
+  color: #52525b;
 }
 
-/* Inputs for type="month" and type="date" dark styling */
+/* type="month" / type="date" dark icon */
 input[type="month"]::-webkit-calendar-picker-indicator,
 input[type="date"]::-webkit-calendar-picker-indicator {
   filter: invert(1) opacity(0.5);
@@ -88,13 +105,13 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 }
 
 select option {
-  background: #131328;
-  color: #eeeef8;
+  background: #141417;
+  color: #fafafa;
 }
 
 /* ===== Button Reset ===== */
 button {
-  font-family: 'IBM Plex Mono', 'Courier New', monospace;
+  font-family: 'Hanken Grotesk', system-ui, sans-serif;
   cursor: pointer;
   border: none;
   background: none;
@@ -110,10 +127,10 @@ button {
 }
 
 .sidebar {
-  width: 210px;
+  width: 226px;
   flex-shrink: 0;
-  background: #0c0c1e;
-  border-right: 1px solid #18183a;
+  background: #09090b;
+  border-right: 1px solid #19191d;
   display: flex;
   flex-direction: column;
   overflow-y: auto;
@@ -122,17 +139,12 @@ button {
 .main-content {
   flex: 1;
   overflow-y: auto;
-  background: #06060f;
+  background: #09090b;
 }
 
 /* ===== Typography Utilities ===== */
-.font-display {
-  font-family: 'Syne', sans-serif;
-  font-weight: 800;
-}
-
 .font-mono {
-  font-family: 'IBM Plex Mono', 'Courier New', monospace;
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
 }
 
 /* ===== Transition Utilities ===== */
@@ -141,17 +153,15 @@ button {
 }
 
 /* ===== Responsive — Mobile Layout ===== */
-
 /*
  * On mobile (< 768px):
  * - Sidebar becomes a fixed bottom nav bar (icons + labels, horizontal)
  * - Main content fills the rest of the screen above it
- * - Extra bottom padding so content doesn't hide under the nav bar
  */
 @media (max-width: 767px) {
   .app-layout {
     flex-direction: column;
-    height: 100dvh; /* dynamic viewport height (handles mobile browser chrome) */
+    height: 100dvh;
   }
 
   .sidebar {
@@ -160,34 +170,23 @@ button {
     left: 0;
     right: 0;
     width: 100%;
-    height: 62px;
+    height: 60px;
     flex-direction: row;
     border-right: none;
-    border-top: 1px solid #18183a;
+    border-top: 1px solid #19191d;
     overflow: hidden;
     z-index: 200;
   }
 
   .main-content {
-    height: calc(100dvh - 62px);
-    max-height: calc(100dvh - 62px);
-    /* Extra bottom padding so last content item is never hidden behind the nav bar */
+    height: calc(100dvh - 60px);
+    max-height: calc(100dvh - 60px);
     padding-bottom: 24px;
   }
 }
 
 /* ===== Animations ===== */
-@keyframes slideUp {
-  from { transform: translateY(100%); }
-  to   { transform: translateY(0); }
-}
-
-/* ===== Recharts Tooltip Dark Override ===== */
-.recharts-tooltip-wrapper .recharts-default-tooltip {
-  background: #131328 !important;
-  border: 1px solid #18183a !important;
-  border-radius: 8px !important;
-  color: #eeeef8 !important;
-  font-family: 'IBM Plex Mono', monospace !important;
-  font-size: 13px !important;
+@keyframes cnt-fade {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
 }

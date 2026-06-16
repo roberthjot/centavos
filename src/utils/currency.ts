@@ -65,6 +65,34 @@ export function formatCompact(amount: number): string {
   return `${sign}$${abs.toFixed(2)}`
 }
 
+/* ===== 2026 redesign display helpers =====
+ * The redesign renders whole-number amounts with locale thousands separators
+ * (de-DE → "5.213") and a real minus sign. A single global toggle (USD/VES)
+ * decides how USD-normalized values are shown.
+ */
+
+/** Group an integer with de-DE separators ("5.213") and a real minus sign. */
+export function groupInt(n: number): string {
+  const neg = n < 0
+  const abs = Math.abs(Math.round(n))
+  return (neg ? '−' : '') + abs.toLocaleString('de-DE')
+}
+
+/**
+ * Format a USD-normalized amount in the chosen display currency.
+ * @param amountUSD - value already normalized to USD
+ * @param display   - 'USD' | 'VES'
+ * @param rate      - 1 USD = rate VES
+ */
+export function formatDisplay(amountUSD: number, display: 'USD' | 'VES', rate: number): string {
+  return display === 'VES' ? `Bs ${groupInt(amountUSD * rate)}` : `$${groupInt(amountUSD)}`
+}
+
+/** Format an amount in its own native currency (whole numbers, grouped). */
+export function formatNative(amount: number, currency: 'USD' | 'VES'): string {
+  return currency === 'VES' ? `Bs ${groupInt(amount)}` : `$${groupInt(amount)}`
+}
+
 /**
  * Get the current YYYY-MM string for the current month.
  */
