@@ -70,6 +70,9 @@ export function Dashboard({
   const [month, setMonth] = useState(currentMonth())
   const isCurrentMonth = month === currentMonth()
 
+  // Hovered month index on the cash-flow chart (null = none).
+  const [hoverPt, setHoverPt] = useState<number | null>(null)
+
   // Local format helper bound to the global display currency.
   const fmt = (usd: number) => formatDisplay(usd, displayCurrency, rate)
 
@@ -117,8 +120,9 @@ export function Dashboard({
 
   // ── Cash-flow chart (last 6 months) ──────────────────────────────
   const chart = useMemo(() => {
-    const inc = finance.last6MonthsData.map(d => d.income)
-    const exp = finance.last6MonthsData.map(d => d.expenses)
+    const data = finance.last6MonthsData
+    const inc = data.map(d => d.income)
+    const exp = data.map(d => d.expenses)
     const n = inc.length
     const W = 580, padL = 4, padR = 4, top = 12, bottom = 168
     const max = Math.max(1, ...inc, ...exp)
@@ -127,18 +131,21 @@ export function Dashboard({
     const line = (arr: number[]) => arr.map((v, i) => `${i === 0 ? 'M' : 'L'}${X(i).toFixed(1)} ${Y(v).toFixed(1)}`).join(' ')
     const incLine = line(inc), expLine = line(exp)
     const incArea = `${incLine} L${X(n - 1).toFixed(1)} ${bottom} L${X(0).toFixed(1)} ${bottom} Z`
-    return {
-      incLine, expLine, incArea,
-      endX: X(n - 1), endY: Y(inc[n - 1]),
-      ticks: finance.last6MonthsData.map((d, i) => ({ x: X(i), label: monthShort(d.month) })),
-    }
+    // Per-month points — drive the hover tooltip + markers.
+    const pts = data.map((d, i) => ({
+      x: X(i), yInc: Y(inc[i]), yExp: Y(exp[i]),
+      inc: inc[i], exp: exp[i],
+      short: monthShort(d.month),
+      full: monthName(d.month).replace(/^./, c => c.toUpperCase()),
+    }))
+    return { incLine, expLine, incArea, endX: X(n - 1), endY: Y(inc[n - 1]), n, W, pts }
   }, [finance.last6MonthsData])
 
   // ── Expenses by category (top 5) ─────────────────────────────────
   const catBars = useMemo(() => {
     const breakdown = finance.getCategoryBreakdown(month)
     const total = breakdown.reduce((a, c) => a + c.amount, 0) || 1
-    return breakdown.slice(0, 5).map(c => ({ name: c.category, amount: c.amount, pct: Math.round((c.amount / total) * 100) }))
+    return breakdown.map(c => ({ name: c.category, amount: c.amount, pct: Math.round((c.amount / total) * 100) }))
   }, [finance, month])
 
   // ── Bottom-row data ──────────────────────────────────────────────
@@ -307,25 +314,69 @@ export function Dashboard({
               </span>
             </div>
           </div>
-          <svg viewBox="0 0 580 200" style={{ width: '100%', height: 'auto', overflow: 'visible' }}>
-            <line x1="2" y1="44" x2="578" y2="44" stroke="#161619" strokeWidth="1" />
-            <line x1="2" y1="98" x2="578" y2="98" stroke="#161619" strokeWidth="1" />
-            <line x1="2" y1="152" x2="578" y2="152" stroke="#161619" strokeWidth="1" />
-            <defs>
-              <linearGradient id="incFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#3ecf8e" stopOpacity="0.13" />
-                <stop offset="100%" stopColor="#3ecf8e" stopOpacity="0" />
-              </linearGradient>
-            </defs>
-            <path d={chart.incArea} fill="url(#incFill)" />
-            <path d={chart.expLine} fill="none" stroke="#52525b" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-            <path d={chart.incLine} fill="none" stroke="#3ecf8e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            <circle cx={chart.endX} cy={chart.endY} r="6.5" fill="none" stroke="#3ecf8e" strokeOpacity="0.28" strokeWidth="1.5" />
-            <circle cx={chart.endX} cy={chart.endY} r="3.5" fill="#3ecf8e" />
-            {chart.ticks.map((t, i) => (
-              <text key={i} x={t.x} y="195" textAnchor="middle" fontSize="10.5" fontFamily="'JetBrains Mono',monospace" fill="#52525b">{t.label}</text>
-            ))}
-          </svg>
+          <div style={{ position: 'relative' }}>
+            <svg
+              viewBox="0 0 580 200" style={{ width: '100%', height: 'auto', overflow: 'visible', display: 'block' }}
+              onMouseMove={e => {
+                const r = e.currentTarget.getBoundingClientRect()
+                const ratio = (e.clientX - r.left) / r.width
+                setHoverPt(Math.max(0, Math.min(chart.n - 1, Math.round(ratio * (chart.n - 1)))))
+              }}
+              onMouseLeave={() => setHoverPt(null)}
+            >
+              <line x1="2" y1="44" x2="578" y2="44" stroke="#161619" strokeWidth="1" />
+              <line x1="2" y1="98" x2="578" y2="98" stroke="#161619" strokeWidth="1" />
+              <line x1="2" y1="152" x2="578" y2="152" stroke="#161619" strokeWidth="1" />
+              <defs>
+                <linearGradient id="incFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#3ecf8e" stopOpacity="0.13" />
+                  <stop offset="100%" stopColor="#3ecf8e" stopOpacity="0" />
+                </linearGradient>
+              </defs>
+              <path d={chart.incArea} fill="url(#incFill)" />
+              <path d={chart.expLine} fill="none" stroke="#52525b" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              <path d={chart.incLine} fill="none" stroke="#3ecf8e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              {/* Hover: vertical guide + markers on both lines */}
+              {hoverPt !== null && (
+                <g>
+                  <line x1={chart.pts[hoverPt].x} y1="6" x2={chart.pts[hoverPt].x} y2="180" stroke="#26262b" strokeWidth="1" />
+                  <circle cx={chart.pts[hoverPt].x} cy={chart.pts[hoverPt].yExp} r="3.5" fill="#52525b" />
+                  <circle cx={chart.pts[hoverPt].x} cy={chart.pts[hoverPt].yInc} r="4" fill="#3ecf8e" />
+                </g>
+              )}
+              {/* End marker — hidden while hovering to avoid overlap */}
+              {hoverPt === null && (
+                <>
+                  <circle cx={chart.endX} cy={chart.endY} r="6.5" fill="none" stroke="#3ecf8e" strokeOpacity="0.28" strokeWidth="1.5" />
+                  <circle cx={chart.endX} cy={chart.endY} r="3.5" fill="#3ecf8e" />
+                </>
+              )}
+              {chart.pts.map((t, i) => (
+                <text key={i} x={t.x} y="195" textAnchor="middle" fontSize="10.5" fontFamily="'JetBrains Mono',monospace" fill={hoverPt === i ? '#a1a1aa' : '#52525b'}>{t.short}</text>
+              ))}
+            </svg>
+            {/* HTML tooltip — month + income + expenses (rounded, in display currency) */}
+            {hoverPt !== null && (
+              <div style={{
+                position: 'absolute', top: 0, left: `${(chart.pts[hoverPt].x / chart.W) * 100}%`,
+                transform: `translate(-50%, -6px)`, pointerEvents: 'none', zIndex: 5,
+                background: '#0e0e10', border: '1px solid #26262b', borderRadius: '8px',
+                padding: '9px 11px', minWidth: '150px', boxShadow: '0 6px 20px rgba(0,0,0,.45)',
+              }}>
+                <div style={{ fontSize: '11px', color: '#a1a1aa', marginBottom: '7px' }}>{chart.pts[hoverPt].full}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '4px' }}>
+                  <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#3ecf8e', flexShrink: 0 }} />
+                  <span style={{ fontSize: '11.5px', color: '#71717a' }}>Ingresos</span>
+                  <span className="font-mono" style={{ fontSize: '11.5px', color: '#fafafa', marginLeft: 'auto' }}>{fmt(chart.pts[hoverPt].inc)}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                  <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#52525b', flexShrink: 0 }} />
+                  <span style={{ fontSize: '11.5px', color: '#71717a' }}>Gastos</span>
+                  <span className="font-mono" style={{ fontSize: '11.5px', color: '#fafafa', marginLeft: 'auto' }}>{fmt(chart.pts[hoverPt].exp)}</span>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         <div>
@@ -383,21 +434,35 @@ export function Dashboard({
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             {accounts.length === 0 ? (
               <div style={{ fontSize: '13px', color: '#52525b', padding: '12px 0' }}>Sin cuentas.</div>
-            ) : accounts.map(a => (
-              <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '11px 0', borderBottom: '1px solid #161619' }}>
-                <div style={{ width: '30px', height: '30px', borderRadius: '8px', background: '#141417', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a1a1aa', fontSize: '12.5px', fontWeight: 600, flexShrink: 0 }}>
-                  {a.name.charAt(0).toUpperCase()}
+            ) : accounts.map(a => {
+              const bal = finance.getAccountBalance(a.id)
+              // Equivalence in the *other* currency (restored from the old dashboard).
+              const equiv = a.currency === 'VES'
+                ? `≈ $${groupInt(toUSD(bal, 'VES', rate))}`
+                : `≈ Bs ${groupInt(bal * rate)}`
+              return (
+                <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '11px 0', borderBottom: '1px solid #161619' }}>
+                  <div style={{ width: '30px', height: '30px', borderRadius: '8px', background: '#141417', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a1a1aa', fontSize: '12.5px', fontWeight: 600, flexShrink: 0 }}>
+                    {a.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '12.5px', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.name}</div>
+                    <div style={{ fontSize: '10.5px', color: '#52525b' }}>{a.currency}</div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div className="font-mono" style={{ fontSize: '12.5px', fontWeight: 500, whiteSpace: 'nowrap' }}>{formatNative(bal, a.currency)}</div>
+                    <div className="font-mono" style={{ fontSize: '10.5px', color: '#52525b', marginTop: '1px', whiteSpace: 'nowrap' }}>{equiv}</div>
+                  </div>
                 </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: '12.5px', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.name}</div>
-                  <div style={{ fontSize: '10.5px', color: '#52525b' }}>{a.currency}</div>
-                </div>
-                <div className="font-mono" style={{ fontSize: '12.5px', fontWeight: 500, whiteSpace: 'nowrap' }}>
-                  {formatNative(finance.getAccountBalance(a.id), a.currency)}
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
+          {accounts.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '12px', marginTop: '2px', borderTop: '1px solid #19191d' }}>
+              <span style={{ fontSize: '12px', color: '#71717a' }}>Total</span>
+              <span className="font-mono" style={{ fontSize: '13px', fontWeight: 600, color: '#3ecf8e' }}>{fmt(netWorth)}</span>
+            </div>
+          )}
         </div>
 
         {/* Goals */}
