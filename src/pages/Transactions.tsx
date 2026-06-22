@@ -27,6 +27,7 @@ interface TransactionsProps {
   onAdd: (tx: Omit<Transaction, 'id' | 'createdAt'>) => void
   onUpdate: (id: string, tx: Partial<Transaction>) => void
   onDelete: (id: string) => void
+  onDeleteTag: (tag: string) => void
 }
 
 const EMPTY_FORM = {
@@ -50,7 +51,7 @@ function dayMonth(date: string): string {
 
 const GRID = 'minmax(0,1.6fr) 150px 150px 70px 110px'
 
-export function Transactions({ accounts, transactions, settings, displayCurrency, onCurrencyChange, onAdd, onUpdate, onDelete }: TransactionsProps) {
+export function Transactions({ accounts, transactions, settings, displayCurrency, onCurrencyChange, onAdd, onUpdate, onDelete, onDeleteTag }: TransactionsProps) {
   const isMobile = useIsMobile()
   const rate = settings.exchangeRate
   const fmt = (usd: number) => formatDisplay(usd, displayCurrency, rate)
@@ -72,6 +73,7 @@ export function Transactions({ accounts, transactions, settings, displayCurrency
   const [form, setForm] = useState({ ...EMPTY_FORM })
   const [formTags, setFormTags] = useState<string[]>([])
   const [tagInput, setTagInput] = useState('')
+  const [confirmTag, setConfirmTag] = useState<string | null>(null)
   const [applyingRecurring, setApplyingRecurring] = useState(false)
 
   const allTags = useMemo(() => {
@@ -414,19 +416,37 @@ export function Transactions({ accounts, transactions, settings, displayCurrency
               if (suggestions.length === 0) return null
               return (
                 <div style={{ marginTop: formTags.length > 0 ? '10px' : '8px' }}>
-                  <div style={{ fontSize: '10.5px', color: '#52525b', marginBottom: '6px' }}>Etiquetas existentes — tocá para agregar</div>
+                  <div style={{ fontSize: '10.5px', color: '#52525b', marginBottom: '6px' }}>Etiquetas existentes — tocá para agregar, ✕ para borrarla de todos</div>
+                  {confirmTag && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '8px', padding: '8px 10px', background: 'rgba(240,113,106,.08)', border: '1px solid rgba(240,113,106,.3)', borderRadius: '8px' }}>
+                      <span style={{ fontSize: '12px', color: '#f0716a' }}>¿Borrar <strong>#{confirmTag}</strong> de todos los movimientos?</span>
+                      <button type="button" onClick={() => { onDeleteTag(confirmTag); removeFormTag(confirmTag); setConfirmTag(null) }} style={{ padding: '5px 11px', background: '#f0716a', color: '#09090b', borderRadius: '6px', fontSize: '12px', fontWeight: 600 }}>Sí, borrar</button>
+                      <button type="button" onClick={() => setConfirmTag(null)} style={{ padding: '5px 11px', background: '#141417', color: '#71717a', border: '1px solid #1c1c1f', borderRadius: '6px', fontSize: '12px' }}>Cancelar</button>
+                    </div>
+                  )}
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                     {suggestions.map(tag => (
-                      <button
-                        key={tag}
-                        type="button"
-                        onClick={() => { setFormTags(prev => [...prev, tag]); setTagInput('') }}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 9px', background: 'transparent', border: '1px dashed #3a3a40', borderRadius: '99px', fontSize: '12px', color: '#71717a', transition: 'all .12s' }}
-                        onMouseEnter={e => { e.currentTarget.style.color = '#3ecf8e'; e.currentTarget.style.borderColor = '#3ecf8e' }}
-                        onMouseLeave={e => { e.currentTarget.style.color = '#71717a'; e.currentTarget.style.borderColor = '#3a3a40' }}
-                      >
-                        + #{tag}
-                      </button>
+                      <span key={tag} style={{ display: 'inline-flex', alignItems: 'center', border: '1px dashed #3a3a40', borderRadius: '99px', overflow: 'hidden' }}>
+                        <button
+                          type="button"
+                          onClick={() => { setFormTags(prev => [...prev, tag]); setTagInput('') }}
+                          style={{ padding: '3px 5px 3px 10px', background: 'transparent', color: '#71717a', fontSize: '12px', transition: 'color .12s' }}
+                          onMouseEnter={e => (e.currentTarget.style.color = '#3ecf8e')}
+                          onMouseLeave={e => (e.currentTarget.style.color = '#71717a')}
+                        >
+                          + #{tag}
+                        </button>
+                        <button
+                          type="button"
+                          title={`Borrar #${tag} de todos los movimientos`}
+                          onClick={() => setConfirmTag(tag)}
+                          style={{ padding: '3px 8px 3px 4px', background: 'transparent', color: '#52525b', fontSize: '12px', lineHeight: 1, transition: 'color .12s' }}
+                          onMouseEnter={e => (e.currentTarget.style.color = '#f0716a')}
+                          onMouseLeave={e => (e.currentTarget.style.color = '#52525b')}
+                        >
+                          ✕
+                        </button>
+                      </span>
                     ))}
                   </div>
                 </div>

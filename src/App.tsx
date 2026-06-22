@@ -184,6 +184,29 @@ export default function App() {
     setTransactions(prev => prev.filter(tx => tx.id !== id))
   }, [])
 
+  // ── Tag management (tags live inside transactions, no separate table) ──
+  // Deleting/renaming a tag updates every transaction that uses it.
+  const deleteTag = useCallback(async (tag: string) => {
+    const affected = transactions.filter(t => t.tags?.includes(tag))
+    await Promise.all(affected.map(t =>
+      db.updateTransaction(t.id, { tags: (t.tags ?? []).filter(x => x !== tag) }),
+    ))
+    setTransactions(prev => prev.map(t =>
+      t.tags?.includes(tag) ? { ...t, tags: (t.tags ?? []).filter(x => x !== tag) } : t,
+    ))
+  }, [transactions])
+
+  const renameTag = useCallback(async (oldTag: string, newTag: string) => {
+    const clean = newTag.trim()
+    if (!clean || clean === oldTag) return
+    const remap = (tags?: string[]) => Array.from(new Set((tags ?? []).map(x => x === oldTag ? clean : x)))
+    const affected = transactions.filter(t => t.tags?.includes(oldTag))
+    await Promise.all(affected.map(t => db.updateTransaction(t.id, { tags: remap(t.tags) })))
+    setTransactions(prev => prev.map(t =>
+      t.tags?.includes(oldTag) ? { ...t, tags: remap(t.tags) } : t,
+    ))
+  }, [transactions])
+
   // ── Goal CRUD ─────────────────────────────────────────────
   const addGoal = useCallback(async (data: Omit<Goal, 'id' | 'createdAt'>) => {
     const goal = await db.addGoal(data)
@@ -276,6 +299,7 @@ export default function App() {
             accounts={accounts} transactions={transactions} settings={settings}
             displayCurrency={displayCurrency} onCurrencyChange={changeDisplayCurrency}
             onAdd={addTransaction} onUpdate={updateTransaction} onDelete={deleteTransaction}
+            onDeleteTag={deleteTag}
           />
         )
       case 'budget':
@@ -325,7 +349,10 @@ export default function App() {
           <SettingsPage
             settings={settings} accounts={accounts}
             displayCurrency={displayCurrency} onCurrencyChange={changeDisplayCurrency}
+            tags={Array.from(new Set(transactions.flatMap(t => t.tags ?? []))).sort()}
             onUpdateSettings={updateSettings}
+            onDeleteTag={deleteTag}
+            onRenameTag={renameTag}
             onClearData={clearAllData}
             onSignOut={handleSignOut}
           />

@@ -18,13 +18,18 @@ interface SettingsProps {
   accounts: Account[]
   displayCurrency: 'USD' | 'VES'
   onCurrencyChange: (cur: 'USD' | 'VES') => void
+  tags: string[]
   onUpdateSettings: (s: Partial<SettingsType>) => void
+  onDeleteTag: (tag: string) => void
+  onRenameTag: (oldTag: string, newTag: string) => void
   onClearData: () => void
   onSignOut: () => void
 }
 
-export function Settings({ settings, accounts, displayCurrency, onCurrencyChange, onUpdateSettings, onClearData, onSignOut }: SettingsProps) {
+export function Settings({ settings, accounts, displayCurrency, onCurrencyChange, tags, onUpdateSettings, onDeleteTag, onRenameTag, onClearData, onSignOut }: SettingsProps) {
   const isMobile = useIsMobile()
+  const [editingTag, setEditingTag] = useState<{ old: string; val: string } | null>(null)
+  const [confirmDelTag, setConfirmDelTag] = useState<string | null>(null)
 
   const [rateInput, setRateInput] = useState(String(settings.exchangeRate))
   const [rateSaved, setRateSaved] = useState(false)
@@ -215,6 +220,53 @@ export function Settings({ settings, accounts, displayCurrency, onCurrencyChange
             {catColumn('inc', 'Ingresos', '#3ecf8e', settings.customIncomeCategories ?? [], newIncomeCat, setNewIncomeCat)}
             {catColumn('exp', 'Gastos', '#f0716a', settings.customExpenseCategories ?? [], newExpenseCat, setNewExpenseCat)}
           </div>
+        </div>
+
+        {/* Tags */}
+        <div style={card}>
+          {sectionTitle('Etiquetas', 'Etiquetas usadas en tus movimientos. Renombrar o eliminar afecta a todos los movimientos que la usan.')}
+          {tags.length === 0 ? (
+            <div style={{ fontSize: '12.5px', color: '#52525b' }}>Aún no usaste ninguna etiqueta.</div>
+          ) : (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              {tags.map(tag => {
+                if (editingTag?.old === tag) {
+                  return (
+                    <span key={tag} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                      <input
+                        autoFocus value={editingTag.val} maxLength={30}
+                        onChange={e => setEditingTag({ old: tag, val: e.target.value })}
+                        onKeyDown={e => { if (e.key === 'Enter') { onRenameTag(tag, editingTag.val); setEditingTag(null) } if (e.key === 'Escape') setEditingTag(null) }}
+                        style={{ width: '130px', padding: '5px 9px', fontSize: '12px' }}
+                      />
+                      <button onClick={() => { onRenameTag(tag, editingTag.val); setEditingTag(null) }} title="Guardar" style={{ width: '28px', height: '28px', borderRadius: '6px', background: '#3ecf8e', color: '#09271b', fontSize: '13px' }}>✓</button>
+                      <button onClick={() => setEditingTag(null)} title="Cancelar" style={{ width: '28px', height: '28px', borderRadius: '6px', background: '#141417', border: '1px solid #26262b', color: '#71717a', fontSize: '13px' }}>✕</button>
+                    </span>
+                  )
+                }
+                if (confirmDelTag === tag) {
+                  return (
+                    <span key={tag} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 8px', background: 'rgba(240,113,106,.08)', border: '1px solid rgba(240,113,106,.3)', borderRadius: '99px' }}>
+                      <span style={{ fontSize: '12px', color: '#f0716a' }}>¿Borrar #{tag}?</span>
+                      <button onClick={() => { onDeleteTag(tag); setConfirmDelTag(null) }} style={{ fontSize: '12px', color: '#f0716a', fontWeight: 600 }}>Sí</button>
+                      <button onClick={() => setConfirmDelTag(null)} style={{ fontSize: '12px', color: '#71717a' }}>No</button>
+                    </span>
+                  )
+                }
+                return (
+                  <span key={tag} style={{ display: 'inline-flex', alignItems: 'center', border: '1px solid #26262b', borderRadius: '99px', overflow: 'hidden', background: '#141417' }}>
+                    <span style={{ padding: '4px 4px 4px 11px', fontSize: '12.5px', color: '#d4d4d8' }}>#{tag}</span>
+                    <button onClick={() => setEditingTag({ old: tag, val: tag })} title="Renombrar" style={{ padding: '4px 4px', color: '#71717a', display: 'flex' }} onMouseEnter={e => (e.currentTarget.style.color = '#fafafa')} onMouseLeave={e => (e.currentTarget.style.color = '#71717a')}>
+                      <Icon name="pencil" size={12} />
+                    </button>
+                    <button onClick={() => setConfirmDelTag(tag)} title="Eliminar de todos" style={{ padding: '4px 9px 4px 4px', color: '#52525b', display: 'flex' }} onMouseEnter={e => (e.currentTarget.style.color = '#f0716a')} onMouseLeave={e => (e.currentTarget.style.color = '#52525b')}>
+                      <Icon name="trash" size={12} />
+                    </button>
+                  </span>
+                )
+              })}
+            </div>
+          )}
         </div>
 
         {/* Data management */}
