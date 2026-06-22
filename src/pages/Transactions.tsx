@@ -407,6 +407,31 @@ export function Transactions({ accounts, transactions, settings, displayCurrency
                 ))}
               </div>
             )}
+            {/* Existing tags — click to add */}
+            {(() => {
+              const q = tagInput.trim().toLowerCase()
+              const suggestions = allTags.filter(t => !formTags.includes(t) && (!q || t.toLowerCase().includes(q)))
+              if (suggestions.length === 0) return null
+              return (
+                <div style={{ marginTop: formTags.length > 0 ? '10px' : '8px' }}>
+                  <div style={{ fontSize: '10.5px', color: '#52525b', marginBottom: '6px' }}>Etiquetas existentes — tocá para agregar</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    {suggestions.map(tag => (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => { setFormTags(prev => [...prev, tag]); setTagInput('') }}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 9px', background: 'transparent', border: '1px dashed #3a3a40', borderRadius: '99px', fontSize: '12px', color: '#71717a', transition: 'all .12s' }}
+                        onMouseEnter={e => { e.currentTarget.style.color = '#3ecf8e'; e.currentTarget.style.borderColor = '#3ecf8e' }}
+                        onMouseLeave={e => { e.currentTarget.style.color = '#71717a'; e.currentTarget.style.borderColor = '#3a3a40' }}
+                      >
+                        + #{tag}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )
+            })()}
           </div>
 
           {/* Recurring */}
